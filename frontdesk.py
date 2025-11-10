@@ -3,11 +3,15 @@ from commodity import  Commodity
 from prettytable import PrettyTable
 from cashier import Cashier
 import os
+import textwrap
+
 class ShopCar:
     '''储存商品对象和购买数量
     '''
     def __init__(self):
         self.shop_list=[]
+        self.owner = ''
+
     def addCommodity(self,com,com_cnt):#传入商品信息和购买数量
         ''' *保证库存肯定是有货的
         商品重复则直接添加数量,否则添加到列表即可
@@ -37,10 +41,12 @@ class ShopCar:
 
     def getMonery(self):
         '''得到总钱数'''
-        res=0.0
-        for com,cnt in self.shop_list:
-            res+=com.getPrice()*cnt
+        res = 0.0
+        for com, cnt in self.shop_list:
+            print(com.getPrice(), cnt)
+            res += com.getPrice() * cnt
         return res
+    
     def getCommodityCnt(self,com_num):
         '''返回商品编号对应的数量'''
         res=0
@@ -101,6 +107,7 @@ class FrontDesk:
             elif cmd=="2":
                 self.queryAll()
             elif cmd=="3":
+                self.car.owner = input('请输入买家名称:').strip()
                 if (self.admin!=None) or self.login():
                     self.shopingMeta()
             elif self.admin!=None and cmd=="4":
@@ -127,12 +134,25 @@ class FrontDesk:
             return False
     def queryAll(self):
         '''前台:查询所有商品信息'''
-        info=Basic.queryAllCommodity()
+
+        info = Basic.queryAllCommodity()
         table = comm = Commodity.getTableaHead()
         for i in info:
+            i = list(i)
+
+            if table.field_names[-1] in '品质特征':
+                description = i[-1]
+                wrapped_desc = '\n'.join(textwrap.wrap(description, width=30))
+                i[-1] = wrapped_desc
+
             table.add_row(i)
+
+        # 设置对齐方式和垂直对齐方式
+        table.align["Description"] = "l"
+        table.valign["Description"] = "t"
         print(table)
         print("以上共 {} 条记录.".format(len(info)))
+
     def queryOne(self):
         '''前台：查询一个商品信息'''
         com_num=input("请输入需要查询商品的编号:")
@@ -175,7 +195,7 @@ class FrontDesk:
             print("商品不存在.")
             return
         com=Commodity(com_info)
-        com_cnt=int(input("请输入商品数量:").strip())
+        com_cnt=float(input("请输入商品数量:").strip())
         if com_cnt <=0:
             print("购买数量必须大于0.")
             return
@@ -204,6 +224,7 @@ class FrontDesk:
             del_cnt=int(input("购物车中该商品有 {} 个,请输入需要删除该商品的数量:".format(have_cnt)).strip())
             self.car.delCommodity(com_num,min(del_cnt,have_cnt))
             print("删除成功.")
+
     def getFlowNum(self):
         while True:
             num=Basic.getFlowNum()
@@ -211,26 +232,26 @@ class FrontDesk:
             if info==[]:
                 return num
     def pay(self):
-         '''前台:结算'''
-         if self.car.empty():
-             print("购物车是空的.")
-             return
-         all_money=self.car.getMonery()
-         pay_money=float(input("请支付{}元:".format(all_money)).strip())
-         if pay_money<all_money :
-             print("支付失败.")
-         else:
-             print("支付成功,找零{}元. ".format(pay_money-all_money))
-             shop_list=self.car.getlist()
-             for com,com_cnt in shop_list:
-                 #删除库存数量
-                 Basic.delCommodityCnt(com.getNo(),com_cnt)
-                 #添加购买信息
-                 num=self.getFlowNum()
-                 Basic.addOneSell(self.admin.getNo(),com.getNo(),num,com_cnt,com.getPrice()*com_cnt)
-             print("您已经成功购买以下商品,支付{}元 ,找零{}元 .".format(pay_money,pay_money-all_money))
-             self.car.printList()
-             self.car.clear()
+        '''前台:结算'''
+        if self.car.empty():
+            print("购物车是空的.")
+            return
+        all_money=self.car.getMonery()
+        pay_money=float(input("请支付{}元:".format(all_money)).strip())
+        discount = pay_money/all_money
+         
+        shop_list=self.car.getlist()
+        count = 0
+        for com, com_cnt in shop_list:
+            count += 1
+            #删除库存数量
+            Basic.delCommodityCnt(com.getNo(),com_cnt)
+            #添加售出信息
+            num = Basic.getSellStockNo()+str(count)
+            Basic.addOneSell(self.admin.getNo(), com.getNo(), num, self.car.owner, com_cnt, com.getPrice() * com_cnt, com.getPrice() * com_cnt * discount)
+        print("您已经成功购买以下商品,支付{}元 ,折扣{} .".format(pay_money, discount))
+        self.car.printList()
+        self.car.clear()
 
 
 

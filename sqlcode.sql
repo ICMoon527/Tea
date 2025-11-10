@@ -77,7 +77,7 @@ GO
 CREATE TABLE Stock(
     purchaser_no varchar(10),
     commodity_no varchar(10),
-    stock_no varchar(10),
+    stock_no varchar(20),
     stock_sprice float,
     stock_quantity float,
     stock_date datetime,
@@ -91,7 +91,8 @@ GO
 CREATE TABLE Sell(
     cashier_no varchar(10),
     commodity_no varchar(10),
-    sell_no varchar(10),
+    sell_no varchar(20),
+    buyer_name NVARCHAR(10),
     sell_quantity float,
     sell_price float,/*应收金额*/
     sell_rmoney float,/*实收金额*/

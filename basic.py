@@ -18,10 +18,11 @@ class Basic:
             return ans
 
     @classmethod
-    def runModify(cls,sql):#ok
+    def runModify(cls, sql):#ok
         with Basic.conn.cursor() as cursor:
             cursor.execute(sql)
             Basic.conn.commit()
+
     @classmethod
     def queryOneCommodity(cls, com_num):#==queryOneCommodityView
         '''返回列表,没有则返回空列表'''
@@ -53,10 +54,12 @@ class Basic:
         if res!=[]:
             res = res[0]
         return res
+    
     @classmethod
-    def addOneSell(cls,cashier_no,com_no,sell_no,sell_cnt,sell_rmoney):#向支付条目中添加信息
-        sql="insert into Sell values('{}','{}','{}',{},{},'{}')".format(cashier_no, com_no, sell_no, sell_cnt, sell_rmoney, Basic.getNowDateTime())
+    def addOneSell(cls, cashier_no, com_no, sell_no, buyer_name, sell_cnt, sell_price, sell_rmoney):#向支付条目中添加信息
+        sql="insert into Sell values('{}', '{}', '{}', '{}', {}, {}, {}, '{}')".format(cashier_no, com_no, sell_no, buyer_name, sell_cnt, sell_price, sell_rmoney, Basic.getNowDateTime())
         Basic.runModify(sql)
+
     @classmethod
     def addOneCommodity(cls,com_no,com_name,com_type,com_size,com_price,com_mdate,com_edate,com_quantity):
         sql="insert into Commodity values('{}','{}','{}','{}',{},'{}','{}',{})".format(com_no,com_name,com_type,com_size,com_price,com_mdate,com_edate,com_quantity)
@@ -65,13 +68,13 @@ class Basic:
     @classmethod
     def modifyOneCommodity(cls,com_num, com_name, com_type, com_size, com_price, com_mdate, com_edate, com_quantity):
         sql='''update Commodity
-        set Commodity__name='{}',commodity__type1='{}',commodity__size='{}',commodity__sprice={},commodity__mdate='{}',commodity__edate='{}',commodity__quantity={}
+        set Commodity_name='{}',commodity_type1='{}',commodity_size='{}',commodity_sprice={},commodity_mdate='{}',commodity_edate='{}',commodity_quantity={}
         where commodity_no='{}'
         '''.format(com_name, com_type, com_size, com_price, com_mdate, com_edate, com_quantity,com_num)
         Basic.runModify(sql)
     @classmethod
     def addOneCommodityCnt(cls,com_num,com_cnt):
-        sql = "update Commodity set commodity__quantity=commodity__quantity +{} where commodity_no='{}'".format(com_cnt,com_num)
+        sql = "update Commodity set commodity_quantity=commodity_quantity +{} where commodity_no='{}'".format(com_cnt,com_num)
         Basic.runModify(sql)
 
     @classmethod
@@ -100,7 +103,7 @@ class Basic:
     @classmethod
     def delCommodityCnt(cls,com_num,com_cnt):
         '''删除某一个商品的数量 '''
-        sql="update Commodity set commodity__quantity=commodity__quantity -{} where commodity_no='{}'".format(com_cnt,com_num)
+        sql="update Commodity set commodity_quantity=commodity_quantity -{} where commodity_no='{}'".format(com_cnt,com_num)
         Basic.runModify(sql)
 
     @classmethod
@@ -151,6 +154,10 @@ class Basic:
     def getNowDateTime(cls):
         # return datetime.datetime.now().strftime("%Y-%m-%d")
         return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    @classmethod
+    def getSellStockNo(cls):
+        return datetime.datetime.now().strftime("%Y%m%d%H%M%S")
 
     @classmethod
     def getFlowNum(cls):
