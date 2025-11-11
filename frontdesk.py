@@ -12,29 +12,31 @@ class ShopCar:
         self.shop_list=[]
         self.owner = ''
 
-    def addCommodity(self,com,com_cnt):#传入商品信息和购买数量
+    def addCommodity(self, com, com_cnt):#传入商品信息和购买数量
         ''' *保证库存肯定是有货的
         商品重复则直接添加数量,否则添加到列表即可
         '''
-        com_no=com.getNo()
+        com_no = com.getNo()
         for i in range(len(self.shop_list)):
-            now_com=self.shop_list[i][0]
+            now_com = self.shop_list[i][0]
             if now_com.getNo()==com_no:
-                self.shop_list[i][1]+=com_cnt
+                self.shop_list[i][1] = round(self.shop_list[i][1] + com_cnt, 3)  # 保留三位小数 0.5g
                 return
         #购物车不存在该商品
-        self.shop_list.append([com,com_cnt])
+        self.shop_list.append([com, com_cnt])
         return
+    
     def delCommodity(self,com_num,com_cnt):
         '''保证满足
         '''
         for i in range(len(self.shop_list)):
-            now_com=self.shop_list[i][0]
-            if now_com.getNo()==com_num:
-                self.shop_list[i][1]-=com_cnt
-                if self.shop_list[i][1]==0:
+            now_com = self.shop_list[i][0]
+            if now_com.getNo() == com_num:
+                self.shop_list[i][1] = round(self.shop_list[i][1] - com_cnt, 3)  # 保留三位小数 0.5g
+                if self.shop_list[i][1] == 0:
                     self.shop_list.pop(i)
                 return
+            
     def clear(self):
         '''清空购物车'''
         self.shop_list.clear()
@@ -45,7 +47,7 @@ class ShopCar:
         for com, cnt in self.shop_list:
             print(com.getPrice(), cnt)
             res += com.getPrice() * cnt
-        return res
+        return round(res, 3)
     
     def getCommodityCnt(self,com_num):
         '''返回商品编号对应的数量'''
@@ -63,7 +65,7 @@ class ShopCar:
         for com, cnt in self.shop_list:
             table.add_row([com.getNo(),com.getName(),com.getType(),com.getSize(),com.getPrice(),cnt])
         print(table)
-        print("总价：",self.getMonery(),end="\n\n")
+        print("总价：", self.getMonery(), end="\n\n")
     def getlist(self):
         ''' 返回购买信息'''
         # res_list=[]
@@ -221,7 +223,7 @@ class FrontDesk:
         if have_cnt==0:
             print("购物车中无该商品")
         else:
-            del_cnt=int(input("购物车中该商品有 {} 个,请输入需要删除该商品的数量:".format(have_cnt)).strip())
+            del_cnt=float(input("购物车中该商品有 {} 个,请输入需要删除该商品的数量:".format(have_cnt)).strip())
             self.car.delCommodity(com_num,min(del_cnt,have_cnt))
             print("删除成功.")
 
@@ -231,6 +233,7 @@ class FrontDesk:
             info=Basic.queryOneSellFlowNum(num)
             if info==[]:
                 return num
+            
     def pay(self):
         '''前台:结算'''
         if self.car.empty():

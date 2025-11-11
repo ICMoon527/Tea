@@ -74,7 +74,7 @@ class Basic:
         Basic.runModify(sql)
     @classmethod
     def addOneCommodityCnt(cls,com_num,com_cnt):
-        sql = "update Commodity set commodity_quantity=commodity_quantity +{} where commodity_no='{}'".format(com_cnt,com_num)
+        sql = "update Commodity set commodity_quantity = ROUND(commodity_quantity + {}, 3) where commodity_no = '{}'".format(com_cnt,com_num)
         Basic.runModify(sql)
 
     @classmethod
@@ -103,7 +103,7 @@ class Basic:
     @classmethod
     def delCommodityCnt(cls,com_num,com_cnt):
         '''删除某一个商品的数量 '''
-        sql="update Commodity set commodity_quantity=commodity_quantity -{} where commodity_no='{}'".format(com_cnt,com_num)
+        sql="update Commodity set commodity_quantity = ROUND(commodity_quantity - {}, 3) where commodity_no = '{}'".format(com_cnt, com_num)
         Basic.runModify(sql)
 
     @classmethod
