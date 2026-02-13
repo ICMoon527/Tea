@@ -98,6 +98,30 @@ class ExcelManager:
     
     def generate_id(self, prefix, sheet_name=None, id_column=None):
         """生成唯一ID"""
+        # 如果是商品编号（前缀为"C"），则使用递增编号
+        if prefix == "C" and sheet_name == "商品信息" and id_column == "商品编号":
+            df = self.read_sheet(sheet_name)
+            if df.empty or id_column not in df.columns:
+                # 如果工作表为空或列不存在，返回T001
+                return "T001"
+            
+            # 提取现有商品编号中的数字部分
+            existing_ids = df[id_column].astype(str).tolist()
+            existing_numbers = []
+            for id_val in existing_ids:
+                if isinstance(id_val, str) and id_val.startswith("T"):
+                    num_part = id_val[1:]  # 去掉"T"前缀
+                    if num_part.isdigit():
+                        existing_numbers.append(int(num_part))
+            
+            # 找到最大编号，返回下一个
+            if existing_numbers:
+                next_num = max(existing_numbers) + 1
+            else:
+                next_num = 1
+            
+            return f"T{next_num:03d}"
+        
         # 如果提供了工作表名和ID列，则确保生成的ID不重复
         if sheet_name and id_column:
             max_attempts = 100  # 最大尝试次数，避免无限循环
@@ -117,11 +141,13 @@ class ExcelManager:
                     return new_id  # 找到不重复的ID
                 
                 attempt += 1
-        
-        # 如果没有提供工作表信息或者尝试失败，使用原始方法
-        timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
-        random_part = f"{random.randint(1000, 9999)}"
-        return f"{prefix}{timestamp}{random_part}"
+            
+            raise Exception(f"无法生成唯一ID: {prefix}")  # 如果尝试失败，抛出异常
+        else:
+            # 如果没有提供工作表名和ID列，则使用时间戳和随机数
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            random_part = f"{random.randint(1000, 9999)}"
+            return f"{prefix}{timestamp}{random_part}"
     
     # 商品相关操作
     def get_all_commodities(self):

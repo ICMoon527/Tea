@@ -440,13 +440,18 @@ class TeaInventorySystem:
         
         # 获取所有进货记录，展示历史品种列表
         df_stocks = self.excel_manager.get_all_stocks()
-        if not df_stocks.empty and len(df_stocks) > 1:
-            df_stocks = df_stocks.iloc[1:]  # 移除标题行
+        if not df_stocks.empty and len(df_stocks) > 0:  # 修复：不再假设需要跳过标题行
             if not df_stocks.empty:
                 print("\n历史进货品种列表:")
-                unique_products = df_stocks[['商品编号', '商品名称']].drop_duplicates()
-                for idx, (original_idx, row) in enumerate(unique_products.iterrows(), 1):
-                    print(f"{idx}. {row['商品名称']} (编号: {row['商品编号']})")
+                # 显示所有进货记录，不进行去重，以便用户能看到每次进货的详细信息
+                for idx, (original_idx, row) in enumerate(df_stocks.iterrows(), 1):
+                    print(f"{idx}. ", end="")
+                    # 遍历当前行的所有字段，显示非空值
+                    fields = []
+                    for col in row.index:
+                        if pd.notna(row[col]) and col != '序号':  # 排除序号列，显示其他所有列
+                            fields.append(f"{col}:{row[col]}")
+                    print(" | ".join(fields))
         
         com_id_input = input("\n请输入商品编号(留空则手动选择历史品种编号): ").strip()
         if not com_id_input:
@@ -454,8 +459,8 @@ class TeaInventorySystem:
             if not df_stocks.empty:
                 try:
                     choice_num = int(input("请输入要进货的历史品种编号 (输入序号): "))
-                    if 1 <= choice_num <= len(unique_products):
-                        selected_product = unique_products.iloc[choice_num-1]
+                    if 1 <= choice_num <= len(df_stocks):
+                        selected_product = df_stocks.iloc[choice_num-1]
                         com_id = selected_product['商品编号']
                         print(f"选择了商品: {selected_product['商品名称']} (编号: {com_id})")
                     else:
@@ -692,11 +697,15 @@ class TeaInventorySystem:
         
         # 获取商品信息用于成本计算
         commodity_df = self.excel_manager.get_all_commodities()
-        if commodity_df.empty or len(commodity_df) <= 1:
+        if commodity_df.empty:
             print("暂无商品信息，无法进行详细统计")
             return
         
         commodity_df = commodity_df.iloc[1:]  # 移除标题行
+        # 检查移除标题行后是否还有数据
+        if commodity_df.empty:
+            print("暂无商品信息，无法进行详细统计")
+            return
         commodity_df['成本价'] = pd.to_numeric(commodity_df['成本价'], errors='coerce')
         
         # 将销售记录与商品信息合并
@@ -966,12 +975,28 @@ class TeaInventorySystem:
             print("暂无销售记录")
             return
         
-        # 按商品编号统计销售数量
+        # 需要考虑销售单位（斤/克）的转换，将所有销售数量统一转换为斤
+        def convert_quantity_to_jin(row):
+            quantity = row['销售数量']
+            unit = row.get('销售单位', '斤')  # 如果没有销售单位，默认为斤
+            
+            # 如果销售单位是克，需要转换为斤
+            if unit == '克':
+                quantity_in_jin = quantity / 500  # 克转斤
+            else:  # 默认是斤
+                quantity_in_jin = quantity
+            
+            return quantity_in_jin
+        
+        # 为每行计算以斤为单位的销售数量
+        df['销售数量(斤)'] = df.apply(convert_quantity_to_jin, axis=1)
+        
+        # 按商品编号统计销售数量（以斤为单位）
         sales_summary = df.groupby('商品编号').agg({
-            '销售数量': 'sum',
+            '销售数量(斤)': 'sum',  # 使用转换后的斤为单位的数量
             '实收金额': 'sum'
         }).round(2)
-        sales_summary.columns = ['总销售数量', '总销售额']
+        sales_summary.columns = ['总销售数量(斤)', '总销售额']
         
         # 与商品信息合并获取商品名称
         commodity_df = self.excel_manager.get_all_commodities()
@@ -981,14 +1006,14 @@ class TeaInventorySystem:
                             on='商品编号', how='left')
             
             # 按销售数量排序
-            result = result.sort_values(by='总销售数量', ascending=False)
+            result = result.sort_values(by='总销售数量(斤)', ascending=False)
             
             print("\n=== 热销商品排行 ===")
             table = PrettyTable(['排名', '商品编号', '商品名称', '茶类', '销售数量(斤)', '销售额'])
             rank = 1
             for _, row in result.head(10).iterrows():  # 显示前10名
                 table.add_row([rank, row['商品编号'], row['商品名称'], 
-                             row['茶类'], row['总销售数量'], row['总销售额']])
+                             row['茶类'], row['总销售数量(斤)'], row['总销售额']])
                 rank += 1
             print(table)
     
@@ -1141,21 +1166,18 @@ class TeaInventorySystem:
                 self.stock_in()
             elif choice == '2':
                 df = self.excel_manager.get_all_stocks()
-                if df.empty or len(df) <= 1:
+                if df.empty:
                     print("暂无进货记录")
                 else:
-                    # 注意：pandas读取Excel时，会将第一行作为列标题，实际数据从第二行开始
-                    # DataFrame中的所有行都是有效数据（除了可能的原始标题行）
-                    # 因此我们显示所有数据行，不需要切片
-                    df_content = df  # 显示所有数据
-                    
-                    if not df_content.empty:
+                    # 修复：只要DataFrame不为空，就说明有数据记录
+                    # pandas读取Excel时，会将第一行作为列标题，后续行为实际数据
+                    if not df.empty:
                         table = PrettyTable()
                         table.field_names = df.columns.tolist()  # 使用原始列名
-                        for _, row in df_content.iterrows():
+                        for _, row in df.iterrows():
                             table.add_row(row.values)
                         print(table)
-                        print(f"以上共 {len(df_content)} 条记录。")
+                        print(f"以上共 {len(df)} 条记录。")
                     else:
                         print("暂无进货记录")
             elif choice == '0':
