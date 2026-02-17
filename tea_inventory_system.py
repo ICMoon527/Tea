@@ -3,6 +3,8 @@ from tea_commodity import TeaCommodity
 from sale_record import SaleRecord
 from stock_record import StockRecord
 from supplier import Supplier
+from customer import Customer
+from data_visualization import DataVisualization
 from datetime import datetime, timedelta
 import pandas as pd
 from prettytable import PrettyTable
@@ -11,7 +13,8 @@ import textwrap
 class TeaInventorySystem:
     def __init__(self):
         self.excel_manager = ExcelManager()
-        self.shopping_cart = []  # 购物车
+        self.data_viz = DataVisualization(self.excel_manager)
+        self.shopping_cart = []
     
     # 商品管理功能
     def add_commodity(self):
@@ -1077,12 +1080,14 @@ class TeaInventorySystem:
             print("2. 销售功能")
             print("3. 进货管理")
             print("4. 供应商管理")
-            print("5. 统计分析")
+            print("5. 客户管理")
+            print("6. 销售记录管理")
+            print("7. 统计分析")
             print("0. 退出系统")
             print("-"*50)
-            
+
             choice = input("请选择功能: ").strip()
-            
+
             if choice == '1':
                 self.product_management_menu()
             elif choice == '2':
@@ -1092,6 +1097,10 @@ class TeaInventorySystem:
             elif choice == '4':
                 self.manage_suppliers()
             elif choice == '5':
+                self.manage_customers()
+            elif choice == '6':
+                self.sales_record_management_menu()
+            elif choice == '7':
                 self.statistics_analysis_menu()
             elif choice == '0':
                 print("感谢使用茶叶进销存管理系统！")
@@ -1192,17 +1201,363 @@ class TeaInventorySystem:
             print("1. 销售统计")
             print("2. 热销商品排行")
             print("3. 盈利分析")
+            print("4. 数据可视化")
             print("0. 返回上级菜单")
-            
+
             choice = input("请选择操作: ").strip()
-            
+
             if choice == '1':
                 self.sales_statistics()
             elif choice == '2':
                 self.top_selling_products()
             elif choice == '3':
                 self.profit_analysis()
+            elif choice == '4':
+                self.data_viz.show_chart_menu()
             elif choice == '0':
                 break
             else:
                 print("无效选择，请重新输入")
+
+    # 客户管理
+    def manage_customers(self):
+        """管理客户"""
+        while True:
+            print("\n=== 客户管理 ===")
+            print("1. 查看所有客户")
+            print("2. 添加客户")
+            print("3. 按编号查询客户")
+            print("4. 按名称查询客户")
+            print("5. 修改客户信息")
+            print("6. 删除客户")
+            print("0. 返回上级菜单")
+
+            choice = input("请选择操作: ").strip()
+
+            if choice == '1':
+                self.view_all_customers()
+            elif choice == '2':
+                self.add_customer()
+            elif choice == '3':
+                self.query_customer_by_id()
+            elif choice == '4':
+                self.query_customer_by_name()
+            elif choice == '5':
+                self.update_customer()
+            elif choice == '6':
+                self.delete_customer()
+            elif choice == '0':
+                break
+            else:
+                print("无效选择，请重新输入")
+
+    def view_all_customers(self):
+        """查看所有客户"""
+        df = self.excel_manager.get_all_customers()
+        if df.empty:
+            print("暂无客户信息")
+            return
+
+        table = PrettyTable()
+        table.field_names = df.columns.tolist()
+
+        for _, row in df.iterrows():
+            table.add_row(row.values)
+
+        print(table)
+        print(f"以上共 {len(df)} 条记录。")
+
+    def add_customer(self):
+        """添加客户"""
+        print("=== 添加客户 ===")
+
+        customer_id_input = input("请输入客户编号(留空则自动生成): ").strip()
+        if customer_id_input:
+            customer_id = customer_id_input
+            existing = self.excel_manager.get_customer_by_id(customer_id)
+            if existing is not None:
+                print("错误：该客户编号已存在！")
+                return
+        else:
+            customer_id = self.excel_manager.generate_id("K", "客户信息", "客户编号")
+            print(f"自动生成的客户编号: {customer_id}")
+
+        name = input("请输入客户名称: ").strip()
+        phone = input("请输入联系电话: ").strip()
+        email = input("请输入电子邮箱: ").strip()
+        address = input("请输入地址: ").strip()
+        remarks = input("请输入备注: ").strip()
+
+        customer = Customer(
+            customer_id=customer_id,
+            name=name,
+            phone=phone,
+            email=email,
+            address=address,
+            remarks=remarks
+        )
+
+        self.excel_manager.add_customer(customer.to_list())
+        print("客户添加成功！")
+
+    def query_customer_by_id(self):
+        """按编号查询客户"""
+        customer_id = input("请输入客户编号: ").strip()
+        customer = self.excel_manager.get_customer_by_id(customer_id)
+
+        if customer is None:
+            print("未找到该客户")
+            return
+
+        table = PrettyTable(['属性', '值'])
+        for key, value in customer.items():
+            table.add_row([key, value])
+        print(table)
+
+    def query_customer_by_name(self):
+        """按名称查询客户"""
+        name = input("请输入客户名称: ").strip()
+        customer = self.excel_manager.get_customer_by_name(name)
+
+        if customer is None:
+            print("未找到该客户")
+            return
+
+        table = PrettyTable(['属性', '值'])
+        for key, value in customer.items():
+            table.add_row([key, value])
+        print(table)
+
+    def update_customer(self):
+        """修改客户信息"""
+        customer_id = input("请输入要修改的客户编号: ").strip()
+        customer = self.excel_manager.get_customer_by_id(customer_id)
+
+        if customer is None:
+            print("未找到该客户")
+            return
+
+        print("当前客户信息：")
+        self._print_single_customer(customer)
+
+        print("\n请输入新的信息（直接回车保持原值）：")
+
+        updates = {}
+
+        new_name = input(f"客户名称 (当前: {customer['客户名称']}): ").strip()
+        if new_name: updates['客户名称'] = new_name
+
+        new_phone = input(f"联系电话 (当前: {customer['联系电话']}): ").strip()
+        if new_phone: updates['联系电话'] = new_phone
+
+        new_email = input(f"电子邮箱 (当前: {customer['电子邮箱']}): ").strip()
+        if new_email: updates['电子邮箱'] = new_email
+
+        new_address = input(f"地址 (当前: {customer['地址']}): ").strip()
+        if new_address: updates['地址'] = new_address
+
+        new_remarks = input(f"备注 (当前: {customer['备注']}): ").strip()
+        if new_remarks: updates['备注'] = new_remarks
+
+        if updates:
+            success = self.excel_manager.update_customer(customer_id, updates)
+            if success:
+                print("客户信息更新成功！")
+            else:
+                print("更新失败！")
+        else:
+            print("未做任何修改。")
+
+    def delete_customer(self):
+        """删除客户"""
+        customer_id = input("请输入要删除的客户编号: ").strip()
+        customer = self.excel_manager.get_customer_by_id(customer_id)
+
+        if customer is None:
+            print("未找到该客户")
+            return
+
+        confirm = input(f"确定要删除客户 '{customer['客户名称']}' 吗？(y/N): ").strip().lower()
+        if confirm == 'y':
+            success = self.excel_manager.delete_customer(customer_id)
+            if success:
+                print("客户删除成功！")
+            else:
+                print("删除失败！")
+        else:
+            print("操作已取消。")
+
+    def _print_single_customer(self, customer):
+        """打印单个客户信息"""
+        table = PrettyTable(['属性', '值'])
+        for key, value in customer.items():
+            table.add_row([key, value])
+        print(table)
+
+    # 销售记录管理
+    def sales_record_management_menu(self):
+        """销售记录管理菜单"""
+        while True:
+            print("\n=== 销售记录管理 ===")
+            print("1. 查询销售记录（多条件）")
+            print("2. 查看所有销售记录")
+            print("3. 修改销售记录")
+            print("4. 作废销售记录")
+            print("0. 返回上级菜单")
+
+            choice = input("请选择操作: ").strip()
+
+            if choice == '1':
+                self.query_sales_records()
+            elif choice == '2':
+                self.view_all_sales()
+            elif choice == '3':
+                self.update_sale_record()
+            elif choice == '4':
+                self.void_sale_record()
+            elif choice == '0':
+                break
+            else:
+                print("无效选择，请重新输入")
+
+    def view_all_sales(self):
+        """查看所有销售记录"""
+        df = self.excel_manager.get_all_sales()
+        if df.empty:
+            print("暂无销售记录")
+            return
+
+        # 过滤作废记录
+        if '是否作废' in df.columns:
+            df = df[df['是否作废'] != True]
+
+        if df.empty:
+            print("暂无有效销售记录")
+            return
+
+        table = PrettyTable()
+        table.field_names = df.columns.tolist()
+
+        for _, row in df.iterrows():
+            table.add_row(row.values)
+
+        print(table)
+        print(f"以上共 {len(df)} 条记录。")
+
+    def query_sales_records(self):
+        """多条件查询销售记录"""
+        print("=== 销售记录查询 ===")
+        print("（留空表示不限制该条件）")
+
+        start_date = input("请输入开始日期 (YYYY-MM-DD): ").strip() or None
+        end_date = input("请输入结束日期 (YYYY-MM-DD): ").strip() or None
+        customer_name = input("请输入客户名称: ").strip() or None
+        com_id = input("请输入商品编号: ").strip() or None
+        com_name = input("请输入商品名称: ").strip() or None
+
+        df = self.excel_manager.query_sales(
+            start_date=start_date,
+            end_date=end_date,
+            customer_name=customer_name,
+            com_id=com_id,
+            com_name=com_name
+        )
+
+        if df.empty:
+            print("未找到符合条件的销售记录")
+            return
+
+        table = PrettyTable()
+        table.field_names = df.columns.tolist()
+
+        for _, row in df.iterrows():
+            table.add_row(row.values)
+
+        print(table)
+        print(f"以上共 {len(df)} 条记录。")
+
+    def update_sale_record(self):
+        """修改销售记录"""
+        sale_id = input("请输入要修改的销售编号: ").strip()
+        sale = self.excel_manager.get_sale_by_id(sale_id)
+
+        if sale is None:
+            print("未找到该销售记录")
+            return
+
+        print("当前销售记录信息：")
+        self._print_single_sale(sale)
+
+        print("\n请输入新的信息（直接回车保持原值）：")
+        print("注意：修改数量或单位会回滚并重新扣减库存！")
+
+        updates = {}
+        rollback = False
+
+        new_qty = input(f"销售数量 (当前: {sale['销售数量']}): ").strip()
+        if new_qty:
+            try:
+                updates['销售数量'] = float(new_qty)
+                rollback = True
+            except ValueError:
+                print("数量必须是数字！")
+                return
+
+        new_unit = input(f"销售单位 (当前: {sale.get('销售单位', '克')}): ").strip()
+        if new_unit:
+            updates['销售单位'] = new_unit
+            rollback = True
+
+        new_price = input(f"单价 (当前: {sale['单价']}): ").strip()
+        if new_price:
+            try:
+                updates['单价'] = float(new_price)
+            except ValueError:
+                print("单价必须是数字！")
+                return
+
+        new_customer = input(f"客户名称 (当前: {sale['客户名称']}): ").strip()
+        if new_customer:
+            updates['客户名称'] = new_customer
+
+        if updates:
+            confirm = input(f"确认修改销售记录？(y/N): ").strip().lower()
+            if confirm == 'y':
+                success = self.excel_manager.update_sale(sale_id, updates, rollback_stock=rollback)
+                if success:
+                    print("销售记录更新成功！")
+                else:
+                    print("更新失败！")
+            else:
+                print("操作已取消。")
+        else:
+            print("未做任何修改。")
+
+    def void_sale_record(self):
+        """作废销售记录"""
+        sale_id = input("请输入要作废的销售编号: ").strip()
+        sale = self.excel_manager.get_sale_by_id(sale_id)
+
+        if sale is None:
+            print("未找到该销售记录")
+            return
+
+        print("当前销售记录信息：")
+        self._print_single_sale(sale)
+
+        confirm = input(f"确定要作废该销售记录？这将回滚库存！(y/N): ").strip().lower()
+        if confirm == 'y':
+            success = self.excel_manager.void_sale(sale_id)
+            if success:
+                print("销售记录已作废，库存已回滚！")
+            else:
+                print("作废失败！")
+        else:
+            print("操作已取消。")
+
+    def _print_single_sale(self, sale):
+        """打印单个销售记录"""
+        table = PrettyTable(['属性', '值'])
+        for key, value in sale.items():
+            table.add_row([key, value])
+        print(table)

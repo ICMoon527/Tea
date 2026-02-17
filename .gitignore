@@ -1,4 +1,4 @@
 __pycache__/
-*.xlsx
-CHANGELOG.md
-LICENSE
+./*.xlsx
+./CHANGELOG.md
+./LICENSE
