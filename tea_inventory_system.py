@@ -550,12 +550,6 @@ class TeaInventorySystem:
     def view_all_suppliers(self):
         """查看所有供应商"""
         df = self.excel_manager.get_all_suppliers()
-        if df.empty or len(df) <= 1:
-            print("暂无供应商信息")
-            return
-        
-        df = df.iloc[1:]  # 移除标题行
-        
         if df.empty:
             print("暂无供应商信息")
             return
@@ -577,8 +571,7 @@ class TeaInventorySystem:
         if supplier_id_input:
             supplier_id = supplier_id_input
             df = self.excel_manager.get_all_suppliers()
-            if not df.empty and len(df) > 1:
-                df = df.iloc[1:]  # 移除标题行
+            if not df.empty:
                 existing = df[df['供应商编号'] == supplier_id]
                 if not existing.empty:
                     print("错误：该供应商编号已存在！")
@@ -612,11 +605,10 @@ class TeaInventorySystem:
         supplier_id = input("请输入要修改的供应商编号: ").strip()
         
         df = self.excel_manager.get_all_suppliers()
-        if df.empty or len(df) <= 1:
+        if df.empty:
             print("暂无供应商信息")
             return
         
-        df = df.iloc[1:]  # 移除标题行
         supplier_idx = df[df['供应商编号'] == supplier_id].index
         
         if len(supplier_idx) == 0:
@@ -665,11 +657,10 @@ class TeaInventorySystem:
         supplier_id = input("请输入要删除的供应商编号: ").strip()
         
         df = self.excel_manager.get_all_suppliers()
-        if df.empty or len(df) <= 1:
+        if df.empty:
             print("暂无供应商信息")
             return
         
-        df = df.iloc[1:]  # 移除标题行
         supplier_idx = df[df['供应商编号'] == supplier_id].index
         
         if len(supplier_idx) == 0:

@@ -6,7 +6,7 @@ class SaleRecord:
 
     def __init__(self, sale_id="", com_id="", com_name="", quantity=0,
                  unit_price=0.0, total_amount=0.0, received_amount=0.0,
-                 customer_name="", sale_date="", sale_unit="克", is_void=False):
+                 customer_name="", sale_date="", sale_unit="斤", is_void=False):
         self.sale_id = sale_id
         self.com_id = com_id
         self.com_name = com_name
@@ -40,6 +40,6 @@ class SaleRecord:
             received_amount=series.get('实收金额', 0.0),
             customer_name=series.get('客户名称', ''),
             sale_date=series.get('销售日期', datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
-            sale_unit=series.get('销售单位', '克'),
+            sale_unit=series.get('销售单位', '斤'),
             is_void=series.get('是否作废', False)
         )

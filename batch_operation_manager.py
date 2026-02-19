@@ -162,8 +162,10 @@ class BatchOperationManager:
         
         for sup_id in supplier_ids:
             try:
-                supplier = self.excel_manager.get_supplier_by_id(sup_id)
-                if supplier is None:
+                # 检查供应商是否存在
+                all_suppliers = self.excel_manager.get_all_suppliers()
+                supplier = all_suppliers[all_suppliers['供应商编号'] == sup_id]
+                if supplier.empty:
                     results['failed'] += 1
                     results['details'].append({
                         'id': sup_id,
@@ -172,7 +174,12 @@ class BatchOperationManager:
                     })
                     continue
                 
-                self.excel_manager.update_supplier(sup_id, updates)
+                # 更新供应商信息
+                idx = all_suppliers[all_suppliers['供应商编号'] == sup_id].index
+                if len(idx) > 0:
+                    for key, value in updates.items():
+                        all_suppliers.at[idx[0], key] = value
+                    self.excel_manager.write_sheet("供应商", all_suppliers)
                 results['success'] += 1
                 results['details'].append({
                     'id': sup_id,

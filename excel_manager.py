@@ -76,10 +76,30 @@ class ExcelManager:
             # 创建新的工作表
             ws = wb.create_sheet(sheet_name)
             
-            # 写入标题行
+            # 写入标题行 - 即使数据为空也要保留列名
+            # 确定要写入的列名
+            expected_columns = {
+                "商品信息": ["商品编号", "茶类", "品种", "公司", "产区", "商品名称", "规格", "成本价", "零售价", "生产日期", "保质期(月)", "当前库存", "品质特征", "年份", "等级", "单位"],
+                "销售记录": ["销售编号", "商品编号", "商品名称", "销售数量", "单价", "应收金额", "实收金额", "客户名称", "销售日期", "销售单位", "是否作废"],
+                "进货记录": ["进货编号", "商品编号", "商品名称", "进货数量", "进货单价", "供应商", "进货日期", "备注", "进货单位"],
+                "供应商": ["供应商编号", "供应商名称", "联系人", "联系电话", "地址", "备注"],
+                "客户信息": ["客户编号", "客户名称", "联系电话", "电子邮箱", "地址", "累计消费", "订单数", "最后购买日期", "客户等级", "备注", "创建日期"]
+            }
+            
+            # 如果数据有列名，使用数据的列名；否则使用默认列名
             if not data.empty:
-                ws.append(data.columns.tolist())
-                # 写入数据行
+                columns_to_write = data.columns.tolist()
+            elif sheet_name in expected_columns:
+                columns_to_write = expected_columns[sheet_name]
+            else:
+                columns_to_write = []
+            
+            # 写入标题行
+            if columns_to_write:
+                ws.append(columns_to_write)
+            
+            # 写入数据行
+            if not data.empty:
                 for _, row in data.iterrows():
                     ws.append(row.tolist())
             
@@ -252,7 +272,51 @@ class ExcelManager:
     
     # 供应商相关操作
     def get_all_suppliers(self):
-        return self.read_sheet("供应商")
+        try:
+            print("=== 开始读取供应商数据 ===")
+            df = self.read_sheet("供应商")
+            print(f"原始数据行数: {len(df)}")
+            print(f"原始数据列名: {list(df.columns)}")
+            print(f"原始数据是否为空: {df.empty}")
+            
+            # 检查数据
+            if not df.empty:
+                # 打印原始数据的前几行
+                print("\n原始数据前3行:")
+                for i in range(min(3, len(df))):
+                    print(f"  行 {i+1}: {list(df.iloc[i])}")
+            
+            # 数据清理
+            if not df.empty:
+                # 1. 首先移除所有字段都是 NaN 的行
+                df = df.dropna(how='all')
+                print(f"\n移除全 NaN 行后，行数: {len(df)}")
+                
+                if not df.empty:
+                    # 2. 将所有字段转换为字符串类型，并去除空白
+                    for col in df.columns:
+                        df[col] = df[col].astype(str).str.strip()
+                    
+                    # 3. 移除空行（所有字段都是空字符串或'nan'的行）
+                    mask = (df != '') & (df != 'nan') & (df != 'NaN') & (df != 'NAN')
+                    df = df[mask.any(axis=1)]
+                    
+                    # 4. 重置索引
+                    df = df.reset_index(drop=True)
+                    print(f"清理后的数据行数: {len(df)}")
+                    
+                    if not df.empty:
+                        print("\n清理后的数据:")
+                        for index, row in df.iterrows():
+                            print(f"  行 {index+1}: {list(row)}")
+            
+            print("=== 读取供应商数据完成 ===")
+            return df
+        except Exception as e:
+            print(f"获取供应商数据时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            return pd.DataFrame()
 
     def add_supplier(self, supplier_data):
         self.append_to_sheet("供应商", supplier_data)
@@ -291,7 +355,51 @@ class ExcelManager:
 
     # 客户相关操作
     def get_all_customers(self):
-        return self.read_sheet("客户信息")
+        try:
+            print("=== 开始读取客户数据 ===")
+            df = self.read_sheet("客户信息")
+            print(f"原始数据行数: {len(df)}")
+            print(f"原始数据列名: {list(df.columns)}")
+            print(f"原始数据是否为空: {df.empty}")
+            
+            # 检查数据
+            if not df.empty:
+                # 打印原始数据的前几行
+                print("\n原始数据前3行:")
+                for i in range(min(3, len(df))):
+                    print(f"  行 {i+1}: {list(df.iloc[i])}")
+            
+            # 数据清理
+            if not df.empty:
+                # 1. 首先移除所有字段都是 NaN 的行
+                df = df.dropna(how='all')
+                print(f"\n移除全 NaN 行后，行数: {len(df)}")
+                
+                if not df.empty:
+                    # 2. 将所有字段转换为字符串类型，并去除空白
+                    for col in df.columns:
+                        df[col] = df[col].astype(str).str.strip()
+                    
+                    # 3. 移除空行（所有字段都是空字符串或'nan'的行）
+                    mask = (df != '') & (df != 'nan') & (df != 'NaN') & (df != 'NAN')
+                    df = df[mask.any(axis=1)]
+                    
+                    # 4. 重置索引
+                    df = df.reset_index(drop=True)
+                    print(f"清理后的数据行数: {len(df)}")
+                    
+                    if not df.empty:
+                        print("\n清理后的数据:")
+                        for index, row in df.iterrows():
+                            print(f"  行 {index+1}: {list(row)}")
+            
+            print("=== 读取客户数据完成 ===")
+            return df
+        except Exception as e:
+            print(f"获取客户数据时出错: {e}")
+            import traceback
+            traceback.print_exc()
+            return pd.DataFrame()
 
     def get_customer_by_id(self, customer_id):
         df = self.read_sheet("客户信息")
