@@ -51,7 +51,7 @@ class TeaInventoryGUI:
 
     def __init__(self, root):
         self.root = root
-        self.root.title("茶叶进销存管理系统")
+        self.root.title("茶叶进销存管理系统——狗拿耗子")
         self.root.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
         self.root.configure(bg=Styles.BACKGROUND_COLOR)
         self.system = TeaInventorySystem()
@@ -111,7 +111,7 @@ class TeaInventoryGUI:
         
         title_label = tk.Label(
             title_frame, 
-            text="茶叶进销存管理系统", 
+            text="茶叶进销存管理系统——狗拿耗子", 
             font=Styles.HEADER_FONT,
             bg=Styles.BACKGROUND_COLOR,
             fg=Styles.HEADER_COLOR
@@ -167,7 +167,7 @@ class TeaInventoryGUI:
         
         footer_label = tk.Label(
             footer_frame, 
-            text="© 2026 茶叶进销存管理系统", 
+            text="© 2026 茶叶进销存管理系统——狗拿耗子", 
             font=Styles.TEXT_FONT,
             bg=Styles.BACKGROUND_COLOR,
             fg="#666666"
@@ -209,11 +209,10 @@ class TeaInventoryGUI:
             ("修改商品", self.update_product_gui),
             ("删除商品", self.delete_product_gui),
             ("按编号查询", self.query_product_by_id_gui),
-            ("按商品名查询", self.query_product_by_name_gui),
-            ("返回主菜单", self.create_main_menu)
+            ("按商品名查询", self.query_product_by_name_gui)
         ]
 
-        # 按3行3列排列按钮
+        # 按2行3列排列按钮
         for i, (text, command) in enumerate(buttons):
             row = i // 3
             col = i % 3
@@ -236,6 +235,32 @@ class TeaInventoryGUI:
             btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
             
             btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
+        
+        # 创建返回主菜单按钮 - 居中靠下
+        footer_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        footer_frame.pack(side=tk.BOTTOM, pady=Styles.PADY_LARGE, fill=tk.X)
+        
+        back_btn = tk.Button(
+            footer_frame, 
+            text="返回主菜单", 
+            font=Styles.BUTTON_FONT,
+            width=Styles.BUTTON_WIDTH,
+            height=Styles.BUTTON_HEIGHT,
+            command=self.create_main_menu,
+            bg=Styles.ERROR_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        )
+        # 添加悬停效果
+        back_btn.bind("<Enter>", lambda e, b=back_btn: b.config(bg="#C0392B"))
+        back_btn.bind("<Leave>", lambda e, b=back_btn: b.config(bg=Styles.ERROR_COLOR))
+        
+        back_btn.pack()
+        # 确保按钮在底部框架中居中
+        footer_frame.pack_propagate(False)
+        footer_frame.configure(height=100)
 
     def view_all_products(self):
         """查看所有商品"""
@@ -975,7 +1000,7 @@ class TeaInventoryGUI:
         """添加商品到购物车GUI"""
         top = tk.Toplevel(self.root)
         top.title("添加商品到购物车")
-        top.geometry("800x600")
+        top.geometry("800x650")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -996,7 +1021,7 @@ class TeaInventoryGUI:
             # 筛选有库存的商品
             available_commodities = all_commodities[all_commodities['当前库存'].astype(float) > 0]
             if not available_commodities.empty:
-                tk.Label(top, text="可销售的商品列表", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+                # tk.Label(top, text="可销售的商品列表", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
                 
                 # 创建商品列表框
                 list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -1038,23 +1063,34 @@ class TeaInventoryGUI:
                 input_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
                 input_frame.pack(pady=Styles.PADY_MEDIUM)
                 
-                tk.Label(input_frame, text="请选择商品序号: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+                # 水平排列输入框
+                input_row_frame = tk.Frame(input_frame, bg=Styles.BACKGROUND_COLOR)
+                input_row_frame.pack(pady=Styles.PADY_SMALL, fill=tk.X)
+                
+                # 商品序号
+                serial_frame = tk.Frame(input_row_frame, bg=Styles.BACKGROUND_COLOR)
+                serial_frame.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                tk.Label(serial_frame, text="商品序号: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack()
                 choice_var = tk.StringVar()
-                tk.Entry(input_frame, textvariable=choice_var, width=10, font=Styles.TEXT_FONT).pack(pady=Styles.PADY_SMALL)
+                tk.Entry(serial_frame, textvariable=choice_var, width=10, font=Styles.TEXT_FONT).pack()
                 
                 # 购买数量
-                tk.Label(input_frame, text="购买数量: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+                quantity_frame = tk.Frame(input_row_frame, bg=Styles.BACKGROUND_COLOR)
+                quantity_frame.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                tk.Label(quantity_frame, text="购买数量: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack()
                 quantity_var = tk.StringVar()
-                quantity_entry = tk.Entry(input_frame, textvariable=quantity_var, width=20, font=Styles.TEXT_FONT)
-                quantity_entry.pack(pady=Styles.PADY_SMALL)
+                quantity_entry = tk.Entry(quantity_frame, textvariable=quantity_var, width=20, font=Styles.TEXT_FONT)
+                quantity_entry.pack()
+                
+                # 购买单位
+                unit_frame = tk.Frame(input_row_frame, bg=Styles.BACKGROUND_COLOR)
+                unit_frame.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                tk.Label(unit_frame, text="单位 (1-斤, 2-克): ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack()
+                unit_var = tk.StringVar(value="2")
+                tk.Entry(unit_frame, textvariable=unit_var, width=10, font=Styles.TEXT_FONT).pack()
                 
                 # 绑定双击事件
                 listbox.bind('<Double-1>', double_click_fill)
-                
-                # 购买单位
-                tk.Label(input_frame, text="购买单位 (1-斤, 2-克): ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
-                unit_var = tk.StringVar(value="2")
-                tk.Entry(input_frame, textvariable=unit_var, width=10, font=Styles.TEXT_FONT).pack(pady=Styles.PADY_SMALL)
                 
                 def add_to_cart():
                     try:
@@ -1119,21 +1155,44 @@ class TeaInventoryGUI:
                 btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
                 btn_add.bind("<Enter>", lambda e, b=btn_add: b.config(bg=Styles.BUTTON_HOVER_COLOR))
                 btn_add.bind("<Leave>", lambda e, b=btn_add: b.config(bg=Styles.PRIMARY_COLOR))
+                
+                # 添加取消按钮到同一框架
+                btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                          width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
+                          bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+                btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                btn_cancel.bind("<Enter>", lambda e, b=btn_cancel: b.config(bg="#C0392B"))
+                btn_cancel.bind("<Leave>", lambda e, b=btn_cancel: b.config(bg=Styles.ERROR_COLOR))
             else:
                 tk.Label(top, text="暂无可销售的商品", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
+                
+                # 为无商品情况添加取消按钮
+                btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+                btn_frame.pack(pady=Styles.PADY_MEDIUM)
+                btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                          width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
+                          bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+                btn_cancel.pack()
+                btn_cancel.bind("<Enter>", lambda e, b=btn_cancel: b.config(bg="#C0392B"))
+                btn_cancel.bind("<Leave>", lambda e, b=btn_cancel: b.config(bg=Styles.ERROR_COLOR))
         else:
             tk.Label(top, text="暂无商品信息", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
-
-        btn_cancel = tk.Button(top, text="取消", font=Styles.BUTTON_FONT,
-                  width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
-                  bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-        btn_cancel.pack(pady=Styles.PADY_MEDIUM)
+            
+            # 为无商品信息情况添加取消按钮
+            btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            btn_frame.pack(pady=Styles.PADY_MEDIUM)
+            btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                      width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
+                      bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_cancel.pack()
+            btn_cancel.bind("<Enter>", lambda e, b=btn_cancel: b.config(bg="#C0392B"))
+            btn_cancel.bind("<Leave>", lambda e, b=btn_cancel: b.config(bg=Styles.ERROR_COLOR))
 
     def view_cart_gui(self):
         """查看购物车GUI"""
         top = tk.Toplevel(self.root)
         top.title("购物车")
-        top.geometry("800x450")
+        top.geometry("800x600")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -1245,7 +1304,7 @@ class TeaInventoryGUI:
                     top.destroy()
                     self.view_cart_gui()
             
-            # 添加删除按钮
+            # 添加按钮
             btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
             btn_frame.pack(pady=Styles.PADY_MEDIUM)
             
@@ -1253,11 +1312,20 @@ class TeaInventoryGUI:
                       width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=delete_selected,
                       bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
             btn_delete.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
-        
-        btn_close = tk.Button(top, text="关闭", font=Styles.BUTTON_FONT,
-                  width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
-                  bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-        btn_close.pack(pady=Styles.PADY_MEDIUM)
+            
+            # 添加关闭按钮到同一框架
+            btn_close = tk.Button(btn_frame, text="关闭", font=Styles.BUTTON_FONT,
+                      width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
+                      bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_close.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            tk.Label(top, text="购物车为空", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
+            # 购物车为空时的关闭按钮
+            btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            btn_frame.pack(pady=Styles.PADY_MEDIUM)
+            btn_close = tk.Button(btn_frame, text="关闭", font=Styles.BUTTON_FONT,
+                      width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
+                      bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_close.pack()
 
     def clear_cart_gui(self):
         """清空购物车GUI"""
