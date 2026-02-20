@@ -1362,7 +1362,7 @@ class TeaInventoryGUI:
 
         # 显示购物车内容
         total_amount = sum(item['小计'] for item in self.system.shopping_cart)
-        tk.Label(top, text="购物车商品", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+        # tk.Label(top, text="购物车商品", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
         
         frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         frame.pack(pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
@@ -1445,7 +1445,7 @@ class TeaInventoryGUI:
                     self.system.excel_manager.add_sale(sale_record.to_list())
                 
                 # 注意：add_sale方法中已经会自动更新客户信息，不需要重复调用
-                messagebox.showinfo("成功", f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元\n找零: {received_amount - total_amount:.2f} 元")
+                messagebox.showinfo("成功", f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元\n折扣: {discount_ratio:.2f}")
                 
                 # 清空购物车
                 self.system.shopping_cart.clear()
