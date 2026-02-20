@@ -10,6 +10,8 @@ from utils import convert_to_jin
 class ExcelManager:
     def __init__(self, filename="tea_inventory.xlsx"):
         self.filename = filename
+        self._cache = {}
+        self._dirty_flags = {}
         self.init_excel_file()
 
     def init_excel_file(self):
@@ -56,16 +58,20 @@ class ExcelManager:
             wb.save(self.filename)
     
     def read_sheet(self, sheet_name):
-        """读取指定工作表的数据"""
+        """读取指定工作表的数据（带缓存）"""
+        if sheet_name in self._cache:
+            return self._cache[sheet_name].copy()
         try:
             df = pd.read_excel(self.filename, sheet_name=sheet_name, engine='openpyxl')
+            self._cache[sheet_name] = df.copy()
+            self._dirty_flags[sheet_name] = False
             return df
         except Exception as e:
             print(f"读取工作表 {sheet_name} 出错: {e}")
             return pd.DataFrame()
     
     def write_sheet(self, sheet_name, data):
-        """写入数据到指定工作表"""
+        """写入数据到指定工作表（更新缓存）"""
         try:
             wb = load_workbook(self.filename)
             
@@ -98,17 +104,19 @@ class ExcelManager:
             if columns_to_write:
                 ws.append(columns_to_write)
             
-            # 写入数据行
+            # 写入数据行 - 使用批量方式写入
             if not data.empty:
                 for _, row in data.iterrows():
                     ws.append(row.tolist())
             
             wb.save(self.filename)
+            self._cache[sheet_name] = data.copy()
+            self._dirty_flags[sheet_name] = False
         except Exception as e:
             print(f"写入工作表 {sheet_name} 出错: {e}")
     
     def append_to_sheet(self, sheet_name, data_row):
-        """向指定工作表追加一行数据"""
+        """向指定工作表追加一行数据（更新缓存）"""
         try:
             wb = load_workbook(self.filename)
             ws = wb[sheet_name]
@@ -122,6 +130,10 @@ class ExcelManager:
                 ws.append(data_row)
             
             wb.save(self.filename)
+            # 清除该工作表的缓存，下次读取时重新加载
+            if sheet_name in self._cache:
+                del self._cache[sheet_name]
+                del self._dirty_flags[sheet_name]
         except Exception as e:
             print(f"追加数据到工作表 {sheet_name} 出错: {e}")
     

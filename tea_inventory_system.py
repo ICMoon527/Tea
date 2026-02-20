@@ -241,8 +241,7 @@ class TeaInventorySystem:
         """添加商品到购物车"""
         # 获取所有有库存的商品，显示可销售的商品列表
         all_commodities = self.excel_manager.get_all_commodities()
-        if not all_commodities.empty and len(all_commodities) > 1:
-            all_commodities = all_commodities.iloc[1:]  # 移除标题行
+        if not all_commodities.empty:
             # 筛选出有库存的商品
             available_commodities = all_commodities[all_commodities['当前库存'].astype(float) > 0]
             if not available_commodities.empty:
@@ -695,11 +694,6 @@ class TeaInventorySystem:
             print("暂无商品信息，无法进行详细统计")
             return
         
-        commodity_df = commodity_df.iloc[1:]  # 移除标题行
-        # 检查移除标题行后是否还有数据
-        if commodity_df.empty:
-            print("暂无商品信息，无法进行详细统计")
-            return
         commodity_df['成本价'] = pd.to_numeric(commodity_df['成本价'], errors='coerce')
         
         # 将销售记录与商品信息合并
@@ -710,35 +704,14 @@ class TeaInventorySystem:
         total_sales_count = len(df)
         total_income = df['实收金额'].sum() if '实收金额' in df.columns else 0
         
-        # 计算总销售数量（需要考虑销售单位转换）
-        def calculate_total_quantity(row):
-            quantity = row['销售数量']
-            unit = row.get('销售单位', '斤')
-            
-            # 如果销售单位是克，需要转换为斤
-            if unit == '克':
-                quantity_in_jin = quantity / 500  # 克转斤
-            else:  # 默认是斤
-                quantity_in_jin = quantity
-            
-            return quantity_in_jin
+        # 计算总销售数量（需要考虑销售单位转换）- 向量化操作
+        units = merged_df.get('销售单位', pd.Series(['斤'] * len(merged_df), index=merged_df.index))
+        unit_multiplier = units.map(lambda x: 1/500 if x == '克' else 1)
+        merged_df['销售数量(斤)'] = merged_df['销售数量'] * unit_multiplier
+        total_quantity = merged_df['销售数量(斤)'].sum()
         
-        total_quantity = merged_df.apply(calculate_total_quantity, axis=1).sum()
-        
-        # 计算总成本和利润，需要考虑销售单位
-        def calculate_cost(row):
-            quantity = row['销售数量']
-            unit = row.get('销售单位', '斤')
-            
-            # 如果销售单位是克，需要转换为斤来计算成本
-            if unit == '克':
-                quantity_in_jin = quantity / 500  # 克转斤
-            else:  # 默认是斤
-                quantity_in_jin = quantity
-            
-            return quantity_in_jin * row['成本价']
-        
-        merged_df['销售成本'] = merged_df.apply(calculate_cost, axis=1)
+        # 计算总成本和利润，需要考虑销售单位 - 向量化操作
+        merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
         total_cost = merged_df['销售成本'].sum()
         total_profit = total_income - total_cost
         profit_margin = (total_profit / total_income * 100) if total_income > 0 else 0
@@ -763,29 +736,13 @@ class TeaInventorySystem:
             choice = input("请选择: ").strip()
             
             if choice == '1':
-                # 按一级茶类统计
+                # 按一级茶类统计 - 向量化操作
                 if '茶类' in merged_df.columns:
-                    # 为了统计目的，我们也需要汇总销售数量（按斤）
-                    def sum_quantity_by_unit(group):
-                        total_quantity_jin = 0
-                        for idx, row in group.iterrows():
-                            quantity = row['销售数量']
-                            unit = row.get('销售单位', '斤')
-                            
-                            if unit == '克':
-                                quantity_in_jin = quantity / 500  # 克转斤
-                            else:  # 默认是斤
-                                quantity_in_jin = quantity
-                            
-                            total_quantity_jin += quantity_in_jin
-                        
-                        return pd.Series({
-                            '销售数量(斤)': total_quantity_jin,
-                            '实收金额': group['实收金额'].sum(),
-                            '销售成本': group['销售成本'].sum()
-                        })
-                    
-                    tea_stats = merged_df.groupby('茶类').apply(sum_quantity_by_unit).round(2)
+                    tea_stats = merged_df.groupby('茶类').agg({
+                        '销售数量(斤)': 'sum',
+                        '实收金额': 'sum',
+                        '销售成本': 'sum'
+                    }).round(2)
                     tea_stats['利润'] = tea_stats['实收金额'] - tea_stats['销售成本']
                     tea_stats['利润率(%)'] = (tea_stats['利润'] / tea_stats['实收金额'] * 100).round(2)
                     
@@ -805,29 +762,13 @@ class TeaInventorySystem:
                     print("暂无茶类信息")
                     
             elif choice == '2':
-                # 按二级茶类（品种）统计
+                # 按二级茶类（品种）统计 - 向量化操作
                 if '品种' in merged_df.columns:
-                    # 汇总销售数量（按斤）
-                    def sum_quantity_by_unit_for_variety(group):
-                        total_quantity_jin = 0
-                        for idx, row in group.iterrows():
-                            quantity = row['销售数量']
-                            unit = row.get('销售单位', '斤')
-                            
-                            if unit == '克':
-                                quantity_in_jin = quantity / 500  # 克转斤
-                            else:  # 默认是斤
-                                quantity_in_jin = quantity
-                            
-                            total_quantity_jin += quantity_in_jin
-                        
-                        return pd.Series({
-                            '销售数量(斤)': total_quantity_jin,
-                            '实收金额': group['实收金额'].sum(),
-                            '销售成本': group['销售成本'].sum()
-                        })
-                    
-                    variety_stats = merged_df.groupby('品种').apply(sum_quantity_by_unit_for_variety).round(2)
+                    variety_stats = merged_df.groupby('品种').agg({
+                        '销售数量(斤)': 'sum',
+                        '实收金额': 'sum',
+                        '销售成本': 'sum'
+                    }).round(2)
                     variety_stats['利润'] = variety_stats['实收金额'] - variety_stats['销售成本']
                     variety_stats['利润率(%)'] = (variety_stats['利润'] / variety_stats['实收金额'] * 100).round(2)
                     
@@ -847,29 +788,13 @@ class TeaInventorySystem:
                     print("暂无品种信息")
                     
             elif choice == '3':
-                # 按商品统计
+                # 按商品统计 - 向量化操作
                 if '商品名称' in merged_df.columns:
-                    # 汇总销售数量（按斤）
-                    def sum_quantity_by_unit_for_product(group):
-                        total_quantity_jin = 0
-                        for idx, row in group.iterrows():
-                            quantity = row['销售数量']
-                            unit = row.get('销售单位', '斤')
-                            
-                            if unit == '克':
-                                quantity_in_jin = quantity / 500  # 克转斤
-                            else:  # 默认是斤
-                                quantity_in_jin = quantity
-                            
-                            total_quantity_jin += quantity_in_jin
-                        
-                        return pd.Series({
-                            '销售数量(斤)': total_quantity_jin,
-                            '实收金额': group['实收金额'].sum(),
-                            '销售成本': group['销售成本'].sum()
-                        })
-                    
-                    product_stats = merged_df.groupby(['商品编号', '商品名称']).apply(sum_quantity_by_unit_for_product).round(2)
+                    product_stats = merged_df.groupby(['商品编号', '商品名称']).agg({
+                        '销售数量(斤)': 'sum',
+                        '实收金额': 'sum',
+                        '销售成本': 'sum'
+                    }).round(2)
                     product_stats['利润'] = product_stats['实收金额'] - product_stats['销售成本']
                     product_stats['利润率(%)'] = (product_stats['利润'] / product_stats['实收金额'] * 100).round(2)
                     
@@ -890,7 +815,7 @@ class TeaInventorySystem:
                     print("暂无商品名称信息")
                     
             elif choice == '4':
-                # 按时间统计
+                # 按时间统计 - 向量化操作
                 if '销售日期' in merged_df.columns:
                     # 将销售日期转换为datetime类型
                     merged_df['销售日期'] = pd.to_datetime(merged_df['销售日期'])
@@ -901,32 +826,24 @@ class TeaInventorySystem:
                     print("3. 按月统计")
                     time_choice = input("请选择: ").strip()
                     
-                    # 汇总销售数量（按斤）和其它指标
-                    def aggregate_by_time(group):
-                        total_quantity_jin = 0
-                        for idx, row in group.iterrows():
-                            quantity = row['销售数量']
-                            unit = row.get('销售单位', '斤')
-                            
-                            if unit == '克':
-                                quantity_in_jin = quantity / 500  # 克转斤
-                            else:  # 默认是斤
-                                quantity_in_jin = quantity
-                            
-                            total_quantity_jin += quantity_in_jin
-                        
-                        return pd.Series({
-                            '销售数量(斤)': total_quantity_jin,
-                            '实收金额': group['实收金额'].sum(),
-                            '销售成本': group['销售成本'].sum()
-                        })
-                    
                     if time_choice == '1':
-                        time_group = merged_df.groupby(merged_df['销售日期'].dt.date).apply(aggregate_by_time)
+                        time_group = merged_df.groupby(merged_df['销售日期'].dt.date).agg({
+                            '销售数量(斤)': 'sum',
+                            '实收金额': 'sum',
+                            '销售成本': 'sum'
+                        })
                     elif time_choice == '2':
-                        time_group = merged_df.groupby(merged_df['销售日期'].dt.to_period('W')).apply(aggregate_by_time)
+                        time_group = merged_df.groupby(merged_df['销售日期'].dt.to_period('W')).agg({
+                            '销售数量(斤)': 'sum',
+                            '实收金额': 'sum',
+                            '销售成本': 'sum'
+                        })
                     elif time_choice == '3':
-                        time_group = merged_df.groupby(merged_df['销售日期'].dt.to_period('M')).apply(aggregate_by_time)
+                        time_group = merged_df.groupby(merged_df['销售日期'].dt.to_period('M')).agg({
+                            '销售数量(斤)': 'sum',
+                            '实收金额': 'sum',
+                            '销售成本': 'sum'
+                        })
                     else:
                         print("无效选择")
                         continue
@@ -969,33 +886,21 @@ class TeaInventorySystem:
             print("暂无销售记录")
             return
         
-        # 需要考虑销售单位（斤/克）的转换，将所有销售数量统一转换为斤
-        def convert_quantity_to_jin(row):
-            quantity = row['销售数量']
-            unit = row.get('销售单位', '斤')  # 如果没有销售单位，默认为斤
-            
-            # 如果销售单位是克，需要转换为斤
-            if unit == '克':
-                quantity_in_jin = quantity / 500  # 克转斤
-            else:  # 默认是斤
-                quantity_in_jin = quantity
-            
-            return quantity_in_jin
-        
-        # 为每行计算以斤为单位的销售数量
-        df['销售数量(斤)'] = df.apply(convert_quantity_to_jin, axis=1)
+        # 需要考虑销售单位（斤/克）的转换，将所有销售数量统一转换为斤 - 向量化操作
+        units = df.get('销售单位', pd.Series(['斤'] * len(df), index=df.index))
+        unit_multiplier = units.map(lambda x: 1/500 if x == '克' else 1)
+        df['销售数量(斤)'] = df['销售数量'] * unit_multiplier
         
         # 按商品编号统计销售数量（以斤为单位）
         sales_summary = df.groupby('商品编号').agg({
-            '销售数量(斤)': 'sum',  # 使用转换后的斤为单位的数量
+            '销售数量(斤)': 'sum',
             '实收金额': 'sum'
         }).round(2)
         sales_summary.columns = ['总销售数量(斤)', '总销售额']
         
         # 与商品信息合并获取商品名称
         commodity_df = self.excel_manager.get_all_commodities()
-        if not commodity_df.empty and len(commodity_df) > 1:
-            commodity_df = commodity_df.iloc[1:]  # 移除标题行
+        if not commodity_df.empty:
             result = pd.merge(sales_summary, commodity_df[['商品编号', '商品名称', '茶类']], 
                             on='商品编号', how='left')
             
@@ -1025,28 +930,18 @@ class TeaInventorySystem:
         
         # 与商品信息合并获取成本价
         commodity_df = self.excel_manager.get_all_commodities()
-        if not commodity_df.empty and len(commodity_df) > 1:
-            commodity_df = commodity_df.iloc[1:]  # 移除标题行
+        if not commodity_df.empty:
             commodity_df['成本价'] = pd.to_numeric(commodity_df['成本价'], errors='coerce')
             
             # 计算每笔销售的成本
             merged_df = pd.merge(df, commodity_df[['商品编号', '成本价']], 
                                on='商品编号', how='left')
             
-            # 计算每笔销售的成本和利润，需要考虑销售单位
-            def calculate_cost(row):
-                quantity = row['销售数量']
-                unit = row.get('销售单位', '斤')
-                
-                # 如果销售单位是克，需要转换为斤来计算成本
-                if unit == '克':
-                    quantity_in_jin = quantity / 500  # 克转斤
-                else:  # 默认是斤
-                    quantity_in_jin = quantity
-                
-                return quantity_in_jin * row['成本价']
-            
-            merged_df['销售成本'] = merged_df.apply(calculate_cost, axis=1)
+            # 计算每笔销售的成本和利润，需要考虑销售单位 - 向量化操作
+            units = merged_df.get('销售单位', pd.Series(['斤'] * len(merged_df), index=merged_df.index))
+            unit_multiplier = units.map(lambda x: 1/500 if x == '克' else 1)
+            quantity_in_jin = merged_df['销售数量'] * unit_multiplier
+            merged_df['销售成本'] = quantity_in_jin * merged_df['成本价']
             merged_df['销售收入'] = merged_df['实收金额']
             merged_df['利润'] = merged_df['销售收入'] - merged_df['销售成本']
             

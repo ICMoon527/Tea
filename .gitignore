@@ -40,3 +40,5 @@ tea_venv/
 .trae/
 *.txt
 *.spec
+cloud_sync_config.json
+operation_logs.xlsx

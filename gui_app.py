@@ -4,6 +4,7 @@ from tkinter import ttk, messagebox, simpledialog, filedialog
 from tea_inventory_system import TeaInventorySystem
 from backup_manager import BackupManager
 from operation_logger import OperationLogger
+from cloud_sync import CloudSyncManager
 import pandas as pd
 from prettytable import PrettyTable
 from datetime import datetime
@@ -56,9 +57,10 @@ class TeaInventoryGUI:
         self.root.configure(bg=Styles.BACKGROUND_COLOR)
         self.system = TeaInventorySystem()
         
-        # 初始化备份管理器和日志记录器
+        # 初始化备份管理器、日志记录器和云同步管理器
         self.backup_manager = BackupManager()
         self.operation_logger = OperationLogger()
+        self.cloud_sync_manager = CloudSyncManager()
 
         # 创建全局样式
         self.style = ttk.Style()
@@ -2751,13 +2753,10 @@ class TeaInventoryGUI:
             merged_df = pd.merge(df, commodity_df[["商品编号", "茶类", "品种", "成本价"]], 
                                on="商品编号", how="left")
 
-            # 计算销售数量（转换为斤）
-            def calculate_quantity(row):
-                quantity = row['销售数量']
-                unit = row.get('销售单位', '斤')
-                return quantity / 500 if unit == '克' else quantity
-
-            merged_df['销售数量(斤)'] = merged_df.apply(calculate_quantity, axis=1)
+            # 计算销售数量（转换为斤）- 使用向量化操作
+            unit_is_gram = merged_df.get('销售单位', '斤') == '克'
+            merged_df['销售数量(斤)'] = merged_df['销售数量']
+            merged_df.loc[unit_is_gram, '销售数量(斤)'] = merged_df.loc[unit_is_gram, '销售数量'] / 500
             merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
             merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
 
@@ -2953,13 +2952,10 @@ class TeaInventoryGUI:
             merged_df = pd.merge(df, commodity_df[["商品编号", "成本价"]], 
                                on="商品编号", how="left")
 
-            # 计算销售数量（转换为斤）
-            def calculate_quantity(row):
-                quantity = row['销售数量']
-                unit = row.get('销售单位', '斤')
-                return quantity / 500 if unit == '克' else quantity
-
-            merged_df['销售数量(斤)'] = merged_df.apply(calculate_quantity, axis=1)
+            # 计算销售数量（转换为斤）- 使用向量化操作
+            unit_is_gram = merged_df.get('销售单位', '斤') == '克'
+            merged_df['销售数量(斤)'] = merged_df['销售数量']
+            merged_df.loc[unit_is_gram, '销售数量(斤)'] = merged_df.loc[unit_is_gram, '销售数量'] / 500
             merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
             merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
 
@@ -3139,11 +3135,16 @@ class TeaInventoryGUI:
         self.system.data_viz.plot_profit_trend(period)
 
     def show_dataframe_window(self, df, title):
-        """显示DataFrame的窗口"""
+        """显示DataFrame的窗口（带分页功能）"""
         top = tk.Toplevel(self.root)
         top.title(title)
         top.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        
+        PAGE_SIZE = 100
+        total_rows = len(df)
+        total_pages = (total_rows + PAGE_SIZE - 1) // PAGE_SIZE
+        current_page_var = tk.IntVar(value=1)
 
         # 打印数据信息
         print(f"show_dataframe_window: 标题={title}, 行数={len(df)}, 列数={len(df.columns)}, 是否为空={df.empty}")
@@ -3184,7 +3185,7 @@ class TeaInventoryGUI:
             ).pack()
             return
 
-        # 创建标题栏
+        # 创建标题栏（包含分页信息）
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         title_frame.pack(pady=Styles.PADY_SMALL, fill=tk.X)
         
@@ -3195,10 +3196,6 @@ class TeaInventoryGUI:
             bg=Styles.BACKGROUND_COLOR,
             fg=Styles.HEADER_COLOR
         ).pack(padx=Styles.PADX_MEDIUM, anchor=tk.W)
-
-        # 创建表格区域
-        table_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        table_frame.pack(padx=Styles.PADX_MEDIUM, pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
 
         # 确保列名是字符串类型
         df.columns = [str(col) for col in df.columns]
@@ -3211,6 +3208,10 @@ class TeaInventoryGUI:
                     # 将克转换为斤
                     df.at[idx, '销售数量'] = row['销售数量'] / 500
                     df.at[idx, '销售单位'] = '斤'
+        
+        # 创建表格区域
+        table_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        table_frame.pack(padx=Styles.PADX_MEDIUM, pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
         
         # 创建树状表格
         tree = ttk.Treeview(table_frame, style="Treeview")
@@ -3282,17 +3283,6 @@ class TeaInventoryGUI:
             width = column_widths.get(str(col), 120)
             tree.column(col, width=width, anchor=tk.CENTER)
 
-        # 插入数据
-        for _, row in df.iterrows():
-            values = []
-            for col in columns:
-                val = row[col]
-                if pd.isna(val):
-                    values.append("")
-                else:
-                    values.append(str(val))
-            tree.insert("", tk.END, values=values)
-
         # 添加滚动条
         scrollbar_y = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=tree.yview)
         scrollbar_x = ttk.Scrollbar(table_frame, orient=tk.HORIZONTAL, command=tree.xview)
@@ -3306,6 +3296,112 @@ class TeaInventoryGUI:
         scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
         scrollbar_x.pack(side=tk.BOTTOM, fill=tk.X)
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 定义加载数据函数
+        def load_page(page_num):
+            """加载指定页的数据"""
+            # 清空现有数据
+            for item in tree.get_children():
+                tree.delete(item)
+            
+            # 计算当前页的起始和结束索引
+            start_idx = (page_num - 1) * PAGE_SIZE
+            end_idx = min(start_idx + PAGE_SIZE, total_rows)
+            
+            # 获取当前页数据
+            page_df = df.iloc[start_idx:end_idx]
+            
+            # 批量插入数据
+            for _, row in page_df.iterrows():
+                values = []
+                for col in columns:
+                    val = row[col]
+                    if pd.isna(val):
+                        values.append("")
+                    else:
+                        values.append(str(val))
+                tree.insert("", tk.END, values=values)
+            
+            # 更新页码信息
+            page_info_label.config(text=f"第 {page_num} / {total_pages} 页 (共 {total_rows} 条记录)")
+            
+            # 更新按钮状态
+            prev_btn.config(state=tk.NORMAL if page_num > 1 else tk.DISABLED)
+            next_btn.config(state=tk.NORMAL if page_num < total_pages else tk.DISABLED)
+            first_btn.config(state=tk.NORMAL if page_num > 1 else tk.DISABLED)
+            last_btn.config(state=tk.NORMAL if page_num < total_pages else tk.DISABLED)
+        
+        # 定义翻页函数
+        def go_first():
+            current_page_var.set(1)
+            load_page(1)
+        
+        def go_prev():
+            current = current_page_var.get()
+            if current > 1:
+                current_page_var.set(current - 1)
+                load_page(current - 1)
+        
+        def go_next():
+            current = current_page_var.get()
+            if current < total_pages:
+                current_page_var.set(current + 1)
+                load_page(current + 1)
+        
+        def go_last():
+            current_page_var.set(total_pages)
+            load_page(total_pages)
+        
+        # 创建分页控制区域（仅在多页时显示）
+        if total_pages > 1:
+            pagination_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            pagination_frame.pack(pady=Styles.PADY_SMALL)
+            
+            # 首页按钮
+            first_btn = tk.Button(pagination_frame, text="首页", font=Styles.TEXT_FONT,
+                               command=go_first, bg=Styles.PRIMARY_COLOR, fg="white",
+                               relief=tk.FLAT, padx=10, pady=3)
+            first_btn.pack(side=tk.LEFT, padx=5)
+            
+            # 上一页按钮
+            prev_btn = tk.Button(pagination_frame, text="上一页", font=Styles.TEXT_FONT,
+                              command=go_prev, bg=Styles.PRIMARY_COLOR, fg="white",
+                              relief=tk.FLAT, padx=10, pady=3)
+            prev_btn.pack(side=tk.LEFT, padx=5)
+            
+            # 页码信息标签
+            page_info_label = tk.Label(pagination_frame, text="", 
+                                      font=Styles.LABEL_FONT,
+                                      bg=Styles.BACKGROUND_COLOR,
+                                      fg=Styles.TEXT_COLOR)
+            page_info_label.pack(side=tk.LEFT, padx=20)
+            
+            # 下一页按钮
+            next_btn = tk.Button(pagination_frame, text="下一页", font=Styles.TEXT_FONT,
+                              command=go_next, bg=Styles.PRIMARY_COLOR, fg="white",
+                              relief=tk.FLAT, padx=10, pady=3)
+            next_btn.pack(side=tk.LEFT, padx=5)
+            
+            # 末页按钮
+            last_btn = tk.Button(pagination_frame, text="末页", font=Styles.TEXT_FONT,
+                               command=go_last, bg=Styles.PRIMARY_COLOR, fg="white",
+                               relief=tk.FLAT, padx=10, pady=3)
+            last_btn.pack(side=tk.LEFT, padx=5)
+            
+            # 加载第一页数据
+            load_page(1)
+        else:
+            # 单页时直接加载全部数据
+            # 批量插入数据
+            for _, row in df.iterrows():
+                values = []
+                for col in columns:
+                    val = row[col]
+                    if pd.isna(val):
+                        values.append("")
+                    else:
+                        values.append(str(val))
+                tree.insert("", tk.END, values=values)
 
         # 添加双击事件，双击查看详情
         def show_detail(e):
@@ -3685,6 +3781,7 @@ class TeaInventoryGUI:
         
         buttons = [
             ("数据备份管理", self.backup_management),
+            ("云端同步管理", self.cloud_sync_management),
             ("操作日志查询", self.log_management),
             ("返回主菜单", self.create_main_menu),
             ("退出系统", self.root.quit)
@@ -4017,6 +4114,340 @@ class TeaInventoryGUI:
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
         refresh_logs()
+        
+        tk.Button(
+            top, 
+            text="关闭", 
+            font=Styles.BUTTON_FONT,
+            width=Styles.BUTTON_WIDTH,
+            height=Styles.BUTTON_HEIGHT,
+            command=top.destroy,
+            bg=Styles.PRIMARY_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        ).pack(pady=Styles.PADY_MEDIUM)
+    
+    def cloud_sync_management(self):
+        """云端同步管理界面 - SFTP 版本"""
+        top = tk.Toplevel(self.root)
+        top.title("云端同步管理 - SFTP")
+        top.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
+        top.configure(bg=Styles.BACKGROUND_COLOR)
+        
+        title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        title_frame.pack(pady=Styles.PADY_SMALL, fill=tk.X)
+        
+        tk.Label(
+            title_frame, 
+            text="云端同步管理 - SFTP", 
+            font=Styles.SUB_HEADER_FONT,
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.HEADER_COLOR
+        ).pack(padx=Styles.PADX_MEDIUM, anchor=tk.W)
+        
+        # 状态信息区域
+        status_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        status_frame.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM, fill=tk.X)
+        
+        status_label = tk.Label(
+            status_frame, 
+            text="同步状态: 未启用",
+            font=Styles.LABEL_FONT,
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.TEXT_COLOR
+        )
+        status_label.pack(anchor=tk.W)
+        
+        # 服务器配置区域
+        config_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR, relief=tk.SOLID, bd=1)
+        config_frame.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM, fill=tk.X)
+        
+        tk.Label(
+            config_frame,
+            text="服务器配置",
+            font=("微软雅黑", 12, "bold"),
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.HEADER_COLOR
+        ).grid(row=0, column=0, columnspan=4, padx=10, pady=10, sticky=tk.W)
+        
+        # 主机地址
+        tk.Label(config_frame, text="主机地址:", bg=Styles.BACKGROUND_COLOR, font=Styles.LABEL_FONT).grid(row=1, column=0, padx=10, pady=5, sticky=tk.E)
+        host_var = tk.StringVar(value="27.tcp.cpolar.top")
+        host_entry = tk.Entry(config_frame, textvariable=host_var, width=25, font=Styles.TEXT_FONT)
+        host_entry.grid(row=1, column=1, padx=5, pady=5, sticky=tk.W)
+        
+        # 端口
+        tk.Label(config_frame, text="端口:", bg=Styles.BACKGROUND_COLOR, font=Styles.LABEL_FONT).grid(row=1, column=2, padx=10, pady=5, sticky=tk.E)
+        port_var = tk.StringVar(value="11007")
+        port_entry = tk.Entry(config_frame, textvariable=port_var, width=10, font=Styles.TEXT_FONT)
+        port_entry.grid(row=1, column=3, padx=5, pady=5, sticky=tk.W)
+        
+        # 用户名
+        tk.Label(config_frame, text="用户名:", bg=Styles.BACKGROUND_COLOR, font=Styles.LABEL_FONT).grid(row=2, column=0, padx=10, pady=5, sticky=tk.E)
+        username_var = tk.StringVar(value="ljw")
+        username_entry = tk.Entry(config_frame, textvariable=username_var, width=25, font=Styles.TEXT_FONT)
+        username_entry.grid(row=2, column=1, padx=5, pady=5, sticky=tk.W)
+        
+        # 密码
+        tk.Label(config_frame, text="密码:", bg=Styles.BACKGROUND_COLOR, font=Styles.LABEL_FONT).grid(row=2, column=2, padx=10, pady=5, sticky=tk.E)
+        password_var = tk.StringVar(value="Lang0527")
+        password_entry = tk.Entry(config_frame, textvariable=password_var, width=25, font=Styles.TEXT_FONT, show="*")
+        password_entry.grid(row=2, column=3, padx=5, pady=5, sticky=tk.W)
+        
+        # 远程路径
+        tk.Label(config_frame, text="远程路径:", bg=Styles.BACKGROUND_COLOR, font=Styles.LABEL_FONT).grid(row=3, column=0, padx=10, pady=5, sticky=tk.E)
+        remote_path_var = tk.StringVar(value="/mnt/sda/ljw/Code/Tea/")
+        remote_path_entry = tk.Entry(config_frame, textvariable=remote_path_var, width=50, font=Styles.TEXT_FONT)
+        remote_path_entry.grid(row=3, column=1, columnspan=3, padx=5, pady=5, sticky=tk.W)
+        
+        def update_status():
+            """更新状态显示"""
+            sync_status = self.cloud_sync_manager.get_sync_status()
+            if sync_status['enabled']:
+                status_text = f"同步状态: 已启用 | 服务器: {sync_status['host']}:{sync_status['port']} | 用户: {sync_status['username']}"
+                if sync_status['last_sync_time']:
+                    status_text += f" | 最后同步: {sync_status['last_sync_time'][:19]}"
+                status_label.config(text=status_text, fg=Styles.SUCCESS_COLOR)
+            elif not sync_status['paramiko_available']:
+                status_label.config(text="同步状态: paramiko 库未安装，请运行: pip install paramiko", fg=Styles.ERROR_COLOR)
+            else:
+                status_label.config(text="同步状态: 未启用", fg=Styles.ERROR_COLOR)
+        
+        def load_existing_config():
+            """加载现有配置"""
+            sync_status = self.cloud_sync_manager.get_sync_status()
+            if sync_status['host']:
+                host_var.set(sync_status['host'])
+            if sync_status['port']:
+                port_var.set(str(sync_status['port']))
+            if sync_status['username']:
+                username_var.set(sync_status['username'])
+            remote_path_var.set(sync_status['remote_path'])
+        
+        def save_server_config():
+            """保存服务器配置"""
+            try:
+                host = host_var.get().strip()
+                port = int(port_var.get().strip())
+                username = username_var.get().strip()
+                password = password_var.get().strip()
+                remote_path = remote_path_var.get().strip()
+                
+                if not host or not username:
+                    messagebox.showwarning("提示", "主机地址和用户名不能为空！")
+                    return
+                
+                success = self.cloud_sync_manager.set_server_config(host, port, username, password, remote_path)
+                if success:
+                    messagebox.showinfo("成功", "服务器配置已保存！")
+                    self.operation_logger.log_operation(
+                        operation_type="设置",
+                        module="云端同步",
+                        details=f"配置 SFTP 服务器: {host}:{port}"
+                    )
+                    update_status()
+                    refresh_cloud_list()
+                else:
+                    messagebox.showerror("错误", "保存配置失败！")
+            except ValueError:
+                messagebox.showerror("错误", "端口必须是数字！")
+        
+        def test_connection():
+            """测试服务器连接"""
+            result = self.cloud_sync_manager.test_connection()
+            if result['success']:
+                messagebox.showinfo("成功", result['message'])
+            else:
+                messagebox.showerror("错误", result['message'])
+        
+        def upload_to_cloud():
+            """上传数据到云端"""
+            if not self.cloud_sync_manager.is_enabled():
+                messagebox.showwarning("提示", "请先配置并保存服务器连接！")
+                return
+            
+            data_files = ["tea_inventory.xlsx", "config.json", "operation_logs.xlsx", "cloud_sync_config.json"]
+            result = self.cloud_sync_manager.upload_to_cloud(data_files)
+            
+            if result['success']:
+                uploaded_str = ", ".join(result.get('uploaded_files', []))
+                messagebox.showinfo("成功", f"{result['message']}\n上传文件: {uploaded_str}")
+                self.operation_logger.log_operation(
+                    operation_type="上传",
+                    module="云端同步",
+                    details=f"上传数据到 SFTP 服务器，版本: {result['version']}"
+                )
+                update_status()
+                refresh_cloud_list()
+            else:
+                messagebox.showerror("错误", result['message'])
+        
+        def download_from_cloud():
+            """从云端下载数据"""
+            if not self.cloud_sync_manager.is_enabled():
+                messagebox.showwarning("提示", "请先配置并保存服务器连接！")
+                return
+            
+            confirm = messagebox.askyesno(
+                "确认下载",
+                "确定要从云端下载数据吗？\n\n本地文件会被备份后覆盖！"
+            )
+            
+            if not confirm:
+                return
+            
+            result = self.cloud_sync_manager.download_from_cloud(".")
+            
+            if result['success']:
+                restored_str = ", ".join(result.get('restored_files', []))
+                messagebox.showinfo("成功", f"{result['message']}\n恢复文件: {restored_str}")
+                self.operation_logger.log_operation(
+                    operation_type="下载",
+                    module="云端同步",
+                    details=f"从 SFTP 服务器恢复数据"
+                )
+                update_status()
+                refresh_cloud_list()
+            else:
+                messagebox.showerror("错误", result['message'])
+        
+        def refresh_cloud_list():
+            """刷新云端文件列表"""
+            for item in tree_cloud.get_children():
+                tree_cloud.delete(item)
+            
+            packages = self.cloud_sync_manager.list_cloud_packages()
+            for pkg in packages:
+                tree_cloud.insert("", tk.END, values=(
+                    pkg.get('filename', ''),
+                    pkg.get('size_formatted', ''),
+                    pkg.get('modified_time_str', '')
+                ))
+        
+        # 配置操作按钮
+        config_btn_frame = tk.Frame(config_frame, bg=Styles.BACKGROUND_COLOR)
+        config_btn_frame.grid(row=4, column=0, columnspan=4, pady=10)
+        
+        tk.Button(
+            config_btn_frame, 
+            text="保存配置", 
+            font=Styles.BUTTON_FONT,
+            width=12,
+            command=save_server_config,
+            bg=Styles.PRIMARY_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            config_btn_frame, 
+            text="测试连接", 
+            font=Styles.BUTTON_FONT,
+            width=12,
+            command=test_connection,
+            bg=Styles.SECONDARY_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # 操作按钮区域
+        btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        btn_frame.pack(pady=Styles.PADY_SMALL)
+        
+        tk.Button(
+            btn_frame, 
+            text="上传到云端", 
+            font=Styles.BUTTON_FONT,
+            width=18,
+            command=upload_to_cloud,
+            bg=Styles.SUCCESS_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame, 
+            text="从云端下载", 
+            font=Styles.BUTTON_FONT,
+            width=18,
+            command=download_from_cloud,
+            bg=Styles.PRIMARY_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        ).pack(side=tk.LEFT, padx=5)
+        
+        tk.Button(
+            btn_frame, 
+            text="刷新列表", 
+            font=Styles.BUTTON_FONT,
+            width=18,
+            command=refresh_cloud_list,
+            bg=Styles.SECONDARY_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        ).pack(side=tk.LEFT, padx=5)
+        
+        # 使用说明
+        help_frame = tk.Frame(top, bg="#E8F4FD", relief=tk.SOLID, bd=1)
+        help_frame.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM, fill=tk.X)
+        
+        help_text = """使用说明：
+1. 本系统通过 SFTP 协议直接连接远程服务器进行数据同步
+2. 请在上方填写服务器信息（已预填您提供的配置）
+3. 点击\"保存配置\"保存服务器连接信息
+4. 点击\"测试连接\"验证服务器连接是否正常
+5. 点击\"上传到云端\"将本地数据上传到服务器
+6. 点击\"从云端下载\"从服务器下载最新数据到本地
+7. 点击\"刷新列表\"查看服务器上的数据文件"""
+        
+        tk.Label(
+            help_frame,
+            text=help_text,
+            font=Styles.TEXT_FONT,
+            bg="#E8F4FD",
+            fg="#333333",
+            justify=tk.LEFT
+        ).pack(padx=10, pady=10, anchor=tk.W)
+        
+        # 云端文件列表
+        table_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        table_frame.pack(padx=Styles.PADX_MEDIUM, pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
+        
+        tree_cloud = ttk.Treeview(
+            table_frame, 
+            style="Treeview", 
+            columns=("filename", "size", "time"), 
+            show="headings"
+        )
+        tree_cloud.heading("filename", text="文件名")
+        tree_cloud.heading("size", text="文件大小")
+        tree_cloud.heading("time", text="修改时间")
+        tree_cloud.column("filename", width=300, anchor=tk.W)
+        tree_cloud.column("size", width=120, anchor=tk.CENTER)
+        tree_cloud.column("time", width=180, anchor=tk.CENTER)
+        
+        scrollbar_y = ttk.Scrollbar(table_frame, orient=tk.VERTICAL, command=tree_cloud.yview)
+        tree_cloud.configure(yscrollcommand=scrollbar_y.set)
+        
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        tree_cloud.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # 加载现有配置并初始化
+        load_existing_config()
+        update_status()
+        refresh_cloud_list()
         
         tk.Button(
             top, 
