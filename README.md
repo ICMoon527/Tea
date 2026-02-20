@@ -89,6 +89,13 @@
   - 批量操作管理器新增（批量更新价格、删除、导入等）
 - **数据可视化**：新增图表展示功能（销售趋势、饼图、利润分析）
 
+### V6.1 - 打包功能增强
+- **独立可执行文件**：支持打包成Windows .exe文件
+- **无需Python环境**：打包后的程序可在无Python环境的Windows电脑上直接运行
+- **目录模式打包**：使用--onedir模式，更稳定可靠
+- **完整依赖包含**：自动包含所有必需的依赖库（pandas, openpyxl, matplotlib, prettytable等）
+- **使用说明完善**：详细的打包和使用说明文档
+
 ## 快速入门指南
 
 ### 安装与启动
@@ -96,7 +103,7 @@
 #### 环境准备
 ```bash
 # 安装依赖包
-pip install pandas openpyxl prettytable
+pip install pandas openpyxl matplotlib prettytable
 ```
 
 #### 启动系统
@@ -107,6 +114,41 @@ python gui_app.py
 # 启动命令行界面
 python main.py
 ```
+
+### 打包成可执行文件
+
+本系统支持打包成独立的Windows可执行文件（.exe），无需安装Python环境即可运行。
+
+#### 方法一：直接命令行打包（推荐）
+在PowerShell中运行：
+```powershell
+# 创建虚拟环境（首次使用）
+python -m venv tea_venv
+
+# 安装依赖
+tea_venv\Scripts\python.exe -m pip install pandas openpyxl matplotlib prettytable pyinstaller
+
+# 清理旧打包文件（可选）
+Remove-Item -Recurse -Force build -ErrorAction SilentlyContinue
+Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
+
+# 打包
+tea_venv\Scripts\python.exe -m PyInstaller --onedir --windowed --name tea_inventory gui_app.py
+```
+
+打包完成后，可执行文件位于：`dist\tea_inventory\tea_inventory.exe`
+
+#### 打包说明
+- **目录模式（--onedir）**：所有依赖放在同一目录下，更稳定可靠
+- **窗口模式（--windowed）**：不显示控制台窗口
+- **必须包含整个文件夹**：把整个 `tea_inventory` 文件夹压缩分享给他人，不能只复制 `.exe` 文件
+- **_internal 文件夹**：包含所有依赖库，必须一起带走
+
+#### 打包后的使用
+1. 把整个 `dist\tea_inventory` 文件夹压缩成 ZIP
+2. 发给其他 Windows 用户
+3. 解压后直接双击 `tea_inventory.exe` 即可运行
+4. 不需要安装 Python 或任何依赖库！
 
 ### 首次使用
 
@@ -391,12 +433,13 @@ A: 在结账时，如果实收金额低于应收金额，系统会提示确认�
 
 ## 版本信息
 
-- **当前版本**: V6.0
+- **当前版本**: V6.1
 - **更新日期**: 2026年2月
 - **开发语言**: Python
 - **数据存储**: Excel
 - **图形界面**: Tkinter
 - **Python版本**: 3.7+
+- **新增功能**: 支持打包成独立Windows可执行文件（.exe）
 
 ---
 

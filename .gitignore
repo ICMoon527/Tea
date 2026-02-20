@@ -39,3 +39,4 @@ Thumbs.db
 tea_venv/
 .trae/
 *.txt
+*.spec
