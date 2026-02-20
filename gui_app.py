@@ -4308,6 +4308,7 @@ class TeaInventoryGUI:
                     module="云端同步",
                     details=f"从 SFTP 服务器恢复数据"
                 )
+                self.system.excel_manager.clear_cache()
                 update_status()
                 refresh_cloud_list()
             else:

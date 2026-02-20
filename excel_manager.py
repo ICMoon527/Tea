@@ -70,6 +70,11 @@ class ExcelManager:
             print(f"读取工作表 {sheet_name} 出错: {e}")
             return pd.DataFrame()
     
+    def clear_cache(self):
+        """清空所有缓存数据"""
+        self._cache.clear()
+        self._dirty_flags.clear()
+    
     def write_sheet(self, sheet_name, data):
         """写入数据到指定工作表（更新缓存）"""
         try:

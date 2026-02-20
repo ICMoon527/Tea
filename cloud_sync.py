@@ -353,8 +353,10 @@ class CloudSyncManager:
                             remote_file = os.path.join(remote_path, file_name)
                             
                             if os.path.exists(local_file):
-                                backup_path = f"{local_file}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-                                shutil.copy2(local_file, backup_path)
+                                backup_dir = os.path.join(target_dir, 'backups')
+                                os.makedirs(backup_dir, exist_ok=True)
+                                backup_file = f"{backup_dir}/{file_name}.backup_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                                shutil.copy2(local_file, backup_file)
                             
                             self.sftp_client.get(remote_file, local_file)
                             restored_files.append(file_name)
