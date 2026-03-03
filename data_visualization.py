@@ -195,6 +195,61 @@ class DataVisualization:
         plt.tight_layout()
         plt.show()
 
+    def plot_product_profit_pie(self):
+        """绘制商品利润饼图 - SCI论文标准"""
+        df_sales = self.excel_manager.get_all_sales()
+        df_products = self.excel_manager.get_all_commodities()
+
+        if df_sales.empty or df_products.empty:
+            print("数据不足")
+            return
+
+        if '是否作废' in df_sales.columns:
+            df_sales = df_sales[df_sales['是否作废'] != True]
+
+        if df_sales.empty:
+            print("暂无有效销售记录")
+            return
+
+        merged = pd.merge(df_sales, df_products[['商品编号', '成本价']], on='商品编号', how='left')
+
+        def calculate_profit(row):
+            qty_jin = convert_to_jin(row['销售数量'], row.get('销售单位', '克'))
+            cost = qty_jin * row['成本价']
+            return row['实收金额'] - cost
+
+        merged['利润'] = merged.apply(calculate_profit, axis=1)
+
+        profit_by_product = merged.groupby('商品名称')['利润'].sum()
+        profit_by_product = profit_by_product.sort_values(ascending=False)
+
+        top_10 = profit_by_product.head(10)
+        
+        colors = plt.cm.Paired(np.linspace(0, 1, len(top_10)))
+
+        fig, ax = plt.subplots(figsize=(6.5, 5.2))
+        
+        wedges, texts, autotexts = ax.pie(
+            top_10.values,
+            labels=top_10.index,
+            colors=colors,
+            autopct='%1.1f%%',
+            startangle=90,
+            wedgeprops={'edgecolor': 'white', 'linewidth': 1.5},
+            textprops={'fontsize': 10},
+            pctdistance=0.85
+        )
+        
+        for autotext in autotexts:
+            autotext.set_fontsize(9)
+            autotext.set_fontweight('bold')
+        
+        ax.set_title('商品利润占比（前10名）', fontsize=14, fontweight='bold', pad=20)
+        
+        plt.axis('equal')
+        plt.tight_layout()
+        plt.show()
+
     def plot_profit_trend(self, period='month'):
         """绘制利润趋势图 - SCI论文标准"""
         df_sales = self.excel_manager.get_all_sales()

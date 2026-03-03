@@ -310,13 +310,16 @@ class ExcelManager:
                 print(f"\n移除全 NaN 行后，行数: {len(df)}")
                 
                 if not df.empty:
-                    # 2. 将所有字段转换为字符串类型，并去除空白
-                    for col in df.columns:
-                        df[col] = df[col].astype(str).str.strip()
+                    # 2. 只对文本列进行字符串转换和去空白
+                    text_columns = ['供应商编号', '供应商名称', '联系人', '联系电话', '地址']
+                    for col in text_columns:
+                        if col in df.columns:
+                            df[col] = df[col].astype(str).str.strip()
                     
-                    # 3. 移除空行（所有字段都是空字符串或'nan'的行）
-                    mask = (df != '') & (df != 'nan') & (df != 'NaN') & (df != 'NAN')
-                    df = df[mask.any(axis=1)]
+                    # 3. 移除空行（检查关键文本字段）
+                    if '供应商名称' in df.columns:
+                        mask = df['供应商名称'].notna() & (df['供应商名称'] != '') & (df['供应商名称'] != 'nan') & (df['供应商名称'] != 'NaN')
+                        df = df[mask]
                     
                     # 4. 重置索引
                     df = df.reset_index(drop=True)
@@ -352,23 +355,28 @@ class ExcelManager:
             # 创建新供应商
             self._create_new_supplier(supplier_name, amount, stock_date)
         else:
-            # 更新现有供应商（如果需要）
-            # 这里可以根据业务需求添加更多的供应商统计信息
-            # 例如：累计进货金额、进货次数等
-            print(f"供应商 {supplier_name} 已存在，进货记录已添加")
+            # 更新现有供应商
+            idx = supplier_row.index[0]
+            # 获取当前累计交易金额，如果为空则为0
+            current_amount = float(df.at[idx, '累计交易金额']) if pd.notna(df.at[idx, '累计交易金额']) else 0.0
+            # 更新累计交易金额
+            df.at[idx, '累计交易金额'] = current_amount + amount
+            # 保存更新
+            self.write_sheet("供应商", df)
+            print(f"供应商 {supplier_name} 已更新，累计交易金额: {current_amount + amount}")
 
     def _create_new_supplier(self, supplier_name, amount, stock_date):
         """创建新供应商"""
         # 生成供应商编号
         supplier_id = self.generate_id("SP", "供应商", "供应商编号")
         
-        # 创建供应商数据
+        # 创建供应商数据（包含初始累计交易金额）
         supplier_data = [
-            supplier_id, supplier_name, "", "", "", ""
+            supplier_id, supplier_name, "", "", "", amount
         ]
         
         self.append_to_sheet("供应商", supplier_data)
-        print(f"新供应商 {supplier_name} 创建成功，供应商编号: {supplier_id}")
+        print(f"新供应商 {supplier_name} 创建成功，供应商编号: {supplier_id}，初始累计交易金额: {amount}")
 
     # 客户相关操作
     def get_all_customers(self):
@@ -393,13 +401,16 @@ class ExcelManager:
                 print(f"\n移除全 NaN 行后，行数: {len(df)}")
                 
                 if not df.empty:
-                    # 2. 将所有字段转换为字符串类型，并去除空白
-                    for col in df.columns:
-                        df[col] = df[col].astype(str).str.strip()
+                    # 2. 只对文本列进行字符串转换和去空白
+                    text_columns = ['客户编号', '客户名称', '联系人', '联系电话', '地址', '客户等级', '最后购买日期']
+                    for col in text_columns:
+                        if col in df.columns:
+                            df[col] = df[col].astype(str).str.strip()
                     
-                    # 3. 移除空行（所有字段都是空字符串或'nan'的行）
-                    mask = (df != '') & (df != 'nan') & (df != 'NaN') & (df != 'NAN')
-                    df = df[mask.any(axis=1)]
+                    # 3. 移除空行（检查关键文本字段）
+                    if '客户名称' in df.columns:
+                        mask = df['客户名称'].notna() & (df['客户名称'] != '') & (df['客户名称'] != 'nan') & (df['客户名称'] != 'NaN')
+                        df = df[mask]
                     
                     # 4. 重置索引
                     df = df.reset_index(drop=True)

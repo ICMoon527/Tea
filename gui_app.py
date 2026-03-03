@@ -11,40 +11,71 @@ from datetime import datetime
 
 # 全局样式配置
 class Styles:
-    """GUI样式配置"""
-    # 颜色方案
-    PRIMARY_COLOR = "#4A90E2"  # 主色调：蓝色
-    SECONDARY_COLOR = "#50E3C2"  # 辅助色：青色
-    BACKGROUND_COLOR = "#F5F7FA"  # 背景色：浅灰色
-    TEXT_COLOR = "#333333"  # 文本色：深灰色
-    HEADER_COLOR = "#2C3E50"  # 标题色：深蓝色
-    BUTTON_HOVER_COLOR = "#357ABD"  # 按钮悬停色
-    ERROR_COLOR = "#E74C3C"  # 错误色：红色
-    SUCCESS_COLOR = "#27AE60"  # 成功色：绿色
+    """GUI样式配置 - 生产级现代化设计"""
+    # 颜色方案 - 渐变/现代配色
+    PRIMARY_COLOR = "#5B8DEE"
+    PRIMARY_LIGHT = "#7BA3F1"
+    PRIMARY_DARK = "#3D6FD4"
+    SECONDARY_COLOR = "#10B981"
+    SECONDARY_LIGHT = "#34D399"
+    SECONDARY_DARK = "#059669"
+    ACCENT_COLOR = "#F59E0B"
+    
+    BACKGROUND_COLOR = "#F8FAFC"
+    SURFACE_COLOR = "#FFFFFF"
+    TEXT_PRIMARY = "#1E293B"
+    TEXT_SECONDARY = "#64748B"
+    TEXT_MUTED = "#94A3B8"
+    HEADER_COLOR = "#1E293B"
+    TEXT_COLOR = "#333333"
+    BUTTON_HOVER_COLOR = "#3D6FD4"
+    
+    BORDER_COLOR = "#E2E8F0"
+    BORDER_LIGHT = "#F1F5F9"
+    
+    ERROR_COLOR = "#EF4444"
+    ERROR_LIGHT = "#FEE2E2"
+    SUCCESS_COLOR = "#10B981"
+    SUCCESS_LIGHT = "#D1FAE5"
+    WARNING_COLOR = "#F59E0B"
+    WARNING_LIGHT = "#FEF3C7"
     
     # 字体配置
-    HEADER_FONT = ("微软雅黑", 24, "bold")
-    SUB_HEADER_FONT = ("微软雅黑", 18, "bold")
-    BUTTON_FONT = ("微软雅黑", 12)
-    LABEL_FONT = ("微软雅黑", 10)
-    TEXT_FONT = ("微软雅黑", 9)
+    HEADER_FONT = ("微软雅黑", 28, "bold")
+    SUB_HEADER_FONT = ("微软雅黑", 20, "bold")
+    TITLE_FONT = ("微软雅黑", 16)
+    BUTTON_FONT = ("微软雅黑", 13)
+    LABEL_FONT = ("微软雅黑", 11)
+    TEXT_FONT = ("微软雅黑", 10)
     
-    # 间距配置
-    PADY_LARGE = 30
-    PADY_MEDIUM = 20
-    PADY_SMALL = 10
-    PADX_LARGE = 40
-    PADX_MEDIUM = 20
-    PADX_SMALL = 10
+    # 间距配置 - 8px网格系统
+    SPACING_XS = 4
+    SPACING_SM = 8
+    SPACING_MD = 16
+    SPACING_LG = 24
+    SPACING_XL = 32
+    SPACING_2XL = 48
+    
+    PADY_LARGE = 32
+    PADY_MEDIUM = 24
+    PADY_SMALL = 12
+    PADX_LARGE = 48
+    PADX_MEDIUM = 24
+    PADX_SMALL = 12
     
     # 控件尺寸
-    BUTTON_WIDTH = 20
+    BUTTON_WIDTH = 22
     BUTTON_HEIGHT = 2
-    ENTRY_WIDTH = 30
-    WINDOW_WIDTH = 1200
-    WINDOW_HEIGHT = 800
-    DIALOG_WIDTH = 600
-    DIALOG_HEIGHT = 400
+    ENTRY_WIDTH = 32
+    WINDOW_WIDTH = 1280
+    WINDOW_HEIGHT = 850
+    DIALOG_WIDTH = 680
+    DIALOG_HEIGHT = 480
+    
+    # 圆角
+    RADIUS_SM = 4
+    RADIUS_MD = 8
+    RADIUS_LG = 12
 
 
 class TeaInventoryGUI:
@@ -69,200 +100,466 @@ class TeaInventoryGUI:
         self.create_main_menu()
 
     def _configure_styles(self):
-        """配置ttk控件样式"""
+        """配置ttk控件样式 - 生产级现代化设计"""
+        self.style.theme_use('clam')
+        
         # 配置按钮样式
-        self.style.configure("TButton", 
+        self.style.configure("Modern.TButton", 
                             font=Styles.BUTTON_FONT,
-                            padding=(10, 5))
-        self.style.map("TButton", 
-                      background=[("active", Styles.BUTTON_HOVER_COLOR)],
-                      foreground=[("active", "white")])
+                            padding=(16, 10),
+                            background=Styles.PRIMARY_COLOR,
+                            foreground="white",
+                            borderwidth=0,
+                            relief="flat",
+                            focuscolor=Styles.PRIMARY_COLOR)
+        self.style.map("Modern.TButton", 
+                      background=[("active", Styles.PRIMARY_DARK),
+                                 ("pressed", Styles.PRIMARY_DARK),
+                                 ("!disabled", Styles.PRIMARY_COLOR)],
+                      foreground=[("!disabled", "white")],
+                      relief=[("pressed", "flat"),
+                              ("!pressed", "flat")])
+        
+        # 配置次要按钮
+        self.style.configure("Secondary.TButton", 
+                            font=Styles.BUTTON_FONT,
+                            padding=(16, 10),
+                            background=Styles.SURFACE_COLOR,
+                            foreground=Styles.TEXT_PRIMARY,
+                            borderwidth=1,
+                            relief="flat",
+                            focuscolor=Styles.SURFACE_COLOR)
+        self.style.map("Secondary.TButton", 
+                      background=[("active", Styles.BORDER_LIGHT),
+                                 ("pressed", Styles.BORDER_COLOR),
+                                 ("!disabled", Styles.SURFACE_COLOR)],
+                      foreground=[("!disabled", Styles.TEXT_PRIMARY)],
+                      relief=[("pressed", "flat"),
+                              ("!pressed", "flat")])
+        
+        # 配置成功按钮
+        self.style.configure("Success.TButton", 
+                            font=Styles.BUTTON_FONT,
+                            padding=(16, 10),
+                            background=Styles.SUCCESS_COLOR,
+                            foreground="white",
+                            borderwidth=0,
+                            relief="flat")
+        self.style.map("Success.TButton", 
+                      background=[("active", Styles.SUCCESS_COLOR),
+                                 ("pressed", Styles.SECONDARY_DARK),
+                                 ("!disabled", Styles.SUCCESS_COLOR)],
+                      foreground=[("!disabled", "white")])
+        
+        # 配置危险按钮
+        self.style.configure("Danger.TButton", 
+                            font=Styles.BUTTON_FONT,
+                            padding=(16, 10),
+                            background=Styles.ERROR_COLOR,
+                            foreground="white",
+                            borderwidth=0,
+                            relief="flat")
+        self.style.map("Danger.TButton", 
+                      background=[("active", "#DC2626"),
+                                 ("pressed", "#B91C1C"),
+                                 ("!disabled", Styles.ERROR_COLOR)],
+                      foreground=[("!disabled", "white")])
         
         # 配置标签样式
         self.style.configure("TLabel", 
                             font=Styles.LABEL_FONT,
                             background=Styles.BACKGROUND_COLOR,
-                            foreground=Styles.TEXT_COLOR)
+                            foreground=Styles.TEXT_PRIMARY)
+        
+        # 配置标题标签
+        self.style.configure("Title.TLabel", 
+                            font=Styles.TITLE_FONT,
+                            background=Styles.BACKGROUND_COLOR,
+                            foreground=Styles.TEXT_PRIMARY)
         
         # 配置输入框样式
         self.style.configure("TEntry", 
                             font=Styles.TEXT_FONT,
-                            padding=(5, 3))
+                            padding=(10, 8),
+                            fieldbackground=Styles.SURFACE_COLOR,
+                            foreground=Styles.TEXT_PRIMARY,
+                            borderwidth=1,
+                            relief="solid")
+        self.style.map("TEntry",
+                      fieldbackground=[("focus", Styles.SURFACE_COLOR)],
+                      bordercolor=[("focus", Styles.PRIMARY_COLOR)])
         
         # 配置树状表格样式
         self.style.configure("Treeview", 
                             font=Styles.TEXT_FONT,
-                            background="white",
-                            foreground=Styles.TEXT_COLOR,
-                            rowheight=25)
+                            background=Styles.SURFACE_COLOR,
+                            foreground=Styles.TEXT_PRIMARY,
+                            rowheight=32,
+                            borderwidth=0,
+                            relief="flat")
         self.style.configure("Treeview.Heading", 
                             font=Styles.LABEL_FONT,
-                            background=Styles.PRIMARY_COLOR,
-                            foreground="black")
+                            background=Styles.BACKGROUND_COLOR,
+                            foreground=Styles.TEXT_SECONDARY,
+                            borderwidth=1,
+                            relief="flat")
         self.style.map("Treeview", 
-                      background=[("selected", Styles.SECONDARY_COLOR)],
+                      background=[("selected", Styles.PRIMARY_COLOR)],
                       foreground=[("selected", "white")])
+        self.style.map("Treeview.Heading",
+                      background=[("active", Styles.BORDER_LIGHT)])
+        
+        # 配置框架样式
+        self.style.configure("Card.TFrame",
+                            background=Styles.SURFACE_COLOR,
+                            relief="flat",
+                            borderwidth=0)
+        
+        # 配置分隔线
+        self.style.configure("TSeparator",
+                            background=Styles.BORDER_COLOR)
 
     def create_main_menu(self):
-        """创建主菜单"""
+        """创建主菜单 - 卡片式现代化设计"""
         self.clear_window()
-
-        # 创建主标题
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_LARGE)
         
+        # 恢复窗口高度到原始大小
+        self.root.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
+
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL, pady=Styles.SPACING_XL)
+
+        # 顶部标题区域
+        header_frame = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        header_frame.pack(fill=tk.X, pady=(0, Styles.SPACING_XL))
+
+        # 主标题
         title_label = tk.Label(
-            title_frame, 
-            text="茶叶进销存管理系统——狗拿耗子", 
+            header_frame,
+            text="茶叶进销存管理系统",
             font=Styles.HEADER_FONT,
             bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
+            fg=Styles.TEXT_PRIMARY
         )
-        title_label.pack()
+        title_label.pack(anchor=tk.W)
 
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
-        
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-        
+        # 副标题
+        subtitle_label = tk.Label(
+            header_frame,
+            text="狗拿耗子工作室 · 专业库存管理解决方案",
+            font=Styles.LABEL_FONT,
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.TEXT_SECONDARY
+        )
+        subtitle_label.pack(anchor=tk.W, pady=(Styles.SPACING_SM, 0))
+
+        # 卡片网格
+        card_grid = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        card_grid.pack(fill=tk.BOTH, expand=True)
+
         buttons = [
-            ("商品管理", self.product_management),
-            ("销售功能", self.sales_management),
-            ("进货管理", self.stock_management),
-            ("供应商管理", self.supplier_management),
-            ("客户管理", self.customer_management),
-            ("销售记录管理", self.sales_record_management),
-            ("统计分析", self.statistics_analysis),
-            ("系统管理", self.system_management)
+            ("商品管理", self.product_management, "📦"),
+            ("销售功能", self.sales_management, "💰"),
+            ("进货管理", self.stock_management, "📥"),
+            ("供应商管理", self.supplier_management, "🤝"),
+            ("客户管理", self.customer_management, "👥"),
+            ("销售记录管理", self.sales_record_management, "📋"),
+            ("统计分析", self.statistics_analysis, "📊"),
+            ("系统管理", self.system_management, "⚙️")
         ]
 
-        # 按2x4网格排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 4
-            col = i % 4
+        # 创建3列网格
+        for i, (text, command, icon) in enumerate(buttons):
+            row = i // 3
+            col = i % 3
             
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
+            self._create_menu_card(card_grid, text, command, icon, row, col)
 
-        # 添加版权信息
-        footer_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        footer_frame.pack(side=tk.BOTTOM, pady=Styles.PADY_MEDIUM)
+        # 底部版权信息
+        footer_frame = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        footer_frame.pack(fill=tk.X, pady=(Styles.SPACING_XL, 0))
         
         footer_label = tk.Label(
-            footer_frame, 
-            text="© 2026 茶叶进销存管理系统——狗拿耗子", 
+            footer_frame,
+            text="© 2026 茶叶进销存管理系统——狗拿耗子",
             font=Styles.TEXT_FONT,
             bg=Styles.BACKGROUND_COLOR,
-            fg="#666666"
+            fg=Styles.TEXT_MUTED
         )
-        footer_label.pack()
+        footer_label.pack(anchor=tk.CENTER)
+
+    def _create_menu_card(self, parent, text, command, icon, row, col):
+        """创建菜单卡片"""
+        card = tk.Frame(
+            parent,
+            bg=Styles.SURFACE_COLOR,
+            highlightbackground=Styles.BORDER_COLOR,
+            highlightthickness=1
+        )
+        card.grid(row=row, column=col, padx=Styles.SPACING_MD, pady=Styles.SPACING_MD, sticky="nsew")
+        
+        # 使卡片可伸缩
+        parent.grid_columnconfigure(col, weight=1)
+        parent.grid_rowconfigure(row, weight=1)
+        
+        # 卡片内容
+        content = tk.Frame(card, bg=Styles.SURFACE_COLOR)
+        content.pack(expand=True, padx=Styles.SPACING_XL, pady=Styles.SPACING_XL)
+        
+        # 图标
+        icon_label = tk.Label(
+            content,
+            text=icon,
+            font=("微软雅黑", 32),
+            bg=Styles.SURFACE_COLOR,
+            fg=Styles.PRIMARY_COLOR
+        )
+        icon_label.pack()
+        
+        # 文本
+        text_label = tk.Label(
+            content,
+            text=text,
+            font=Styles.TITLE_FONT,
+            bg=Styles.SURFACE_COLOR,
+            fg=Styles.TEXT_PRIMARY
+        )
+        text_label.pack(pady=(Styles.SPACING_SM, 0))
+        
+        # 悬停效果
+        def on_enter(e):
+            card.config(highlightbackground=Styles.PRIMARY_COLOR, bg=Styles.BORDER_LIGHT)
+            content.config(bg=Styles.BORDER_LIGHT)
+            icon_label.config(bg=Styles.BORDER_LIGHT)
+            text_label.config(bg=Styles.BORDER_LIGHT)
+        
+        def on_leave(e):
+            card.config(highlightbackground=Styles.BORDER_COLOR, bg=Styles.SURFACE_COLOR)
+            content.config(bg=Styles.SURFACE_COLOR)
+            icon_label.config(bg=Styles.SURFACE_COLOR)
+            text_label.config(bg=Styles.SURFACE_COLOR)
+        
+        card.bind("<Enter>", on_enter)
+        card.bind("<Leave>", on_leave)
+        content.bind("<Enter>", on_enter)
+        content.bind("<Leave>", on_leave)
+        
+        # 点击事件
+        card.bind("<Button-1>", lambda e: command())
+        content.bind("<Button-1>", lambda e: command())
+        icon_label.bind("<Button-1>", lambda e: command())
+        text_label.bind("<Button-1>", lambda e: command())
 
     def clear_window(self):
         """清空窗口"""
         for widget in self.root.winfo_children():
             widget.destroy()
 
-    def product_management(self):
-        """商品管理界面"""
-        self.clear_window()
+    def _create_page_header(self, parent, title, subtitle=None):
+        """创建统一的页面标题区域"""
+        header_frame = tk.Frame(parent, bg=Styles.BACKGROUND_COLOR)
+        header_frame.pack(fill=tk.X, pady=(Styles.SPACING_LG, Styles.SPACING_MD))
         
-        # 创建标题区域
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
-        
-        tk.Label(
-            title_frame, 
-            text="商品管理", 
+        # 标题
+        title_label = tk.Label(
+            header_frame,
+            text=title,
             font=Styles.SUB_HEADER_FONT,
             bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
-        ).pack()
-
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
-        
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-
-        buttons = [
-            ("查看所有商品", self.view_all_products),
-            ("添加商品", self.add_product_gui),
-            ("修改商品", self.update_product_gui),
-            ("删除商品", self.delete_product_gui),
-            ("按编号查询", self.query_product_by_id_gui),
-            ("按商品名查询", self.query_product_by_name_gui)
-        ]
-
-        # 按2行3列排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 3
-            col = i % 3
-            
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
-        
-        # 创建返回主菜单按钮 - 居中靠下
-        footer_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        footer_frame.pack(side=tk.BOTTOM, pady=Styles.PADY_LARGE, fill=tk.X)
-        
-        back_btn = tk.Button(
-            footer_frame, 
-            text="返回主菜单", 
-            font=Styles.BUTTON_FONT,
-            width=Styles.BUTTON_WIDTH,
-            height=Styles.BUTTON_HEIGHT,
-            command=self.create_main_menu,
-            bg=Styles.ERROR_COLOR,
-            fg="white",
-            relief=tk.FLAT,
-            padx=10,
-            pady=5
+            fg=Styles.TEXT_PRIMARY
         )
-        # 添加悬停效果
-        back_btn.bind("<Enter>", lambda e, b=back_btn: b.config(bg="#C0392B"))
-        back_btn.bind("<Leave>", lambda e, b=back_btn: b.config(bg=Styles.ERROR_COLOR))
+        title_label.pack(anchor=tk.W)
         
-        back_btn.pack()
-        # 确保按钮在底部框架中居中
-        footer_frame.pack_propagate(False)
-        footer_frame.configure(height=100)
+        # 副标题（可选）
+        if subtitle:
+            subtitle_label = tk.Label(
+                header_frame,
+                text=subtitle,
+                font=Styles.LABEL_FONT,
+                bg=Styles.BACKGROUND_COLOR,
+                fg=Styles.TEXT_SECONDARY
+            )
+            subtitle_label.pack(anchor=tk.W, pady=(Styles.SPACING_XS, 0))
+        
+        return header_frame
+
+    def _create_back_button(self, parent, command):
+        """创建返回按钮"""
+        btn_frame = tk.Frame(parent, bg=Styles.BACKGROUND_COLOR)
+        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(Styles.SPACING_MD, Styles.SPACING_LG))
+        
+        btn = ttk.Button(
+            btn_frame,
+            text="← 返回主菜单",
+            command=command,
+            style="Secondary.TButton"
+        )
+        btn.pack(anchor=tk.W, padx=Styles.SPACING_XL)
+        return btn
+
+    def _create_button_grid(self, parent, buttons, columns=None):
+        """创建统一的卡片式按钮网格
+        
+        Args:
+            parent: 父容器
+            buttons: 按钮列表，格式为 [(text, command, icon), ...]
+            columns: 列数（自动判断如果为None）
+        """
+        button_grid = tk.Frame(parent, bg=Styles.BACKGROUND_COLOR)
+        button_grid.pack(pady=Styles.SPACING_LG, fill=tk.BOTH, expand=True)
+        
+        # 智能判断列数 - 更合理的分布
+        num_buttons = len(buttons)
+        if columns is None:
+            if num_buttons <= 1:
+                columns = 1
+            elif num_buttons <= 2:
+                columns = 2
+            elif num_buttons <= 4:
+                columns = 2
+            elif num_buttons <= 6:
+                columns = 3
+            elif num_buttons <= 8:
+                columns = 4
+            else:
+                columns = 4
+        
+        # 先配置所有列和行的weight，确保均匀分布
+        max_rows = (num_buttons + columns - 1) // columns
+        for col in range(columns):
+            button_grid.grid_columnconfigure(col, weight=1, uniform="column")
+        for row in range(max_rows):
+            button_grid.grid_rowconfigure(row, weight=1, uniform="row")
+        
+        for i, item in enumerate(buttons):
+            if len(item) == 3:
+                text, command, icon = item
+            else:
+                text, command = item
+                icon = "📋"
+            
+            row = i // columns
+            col = i % columns
+            
+            # 创建卡片
+            card = tk.Frame(
+                button_grid,
+                bg=Styles.SURFACE_COLOR,
+                highlightbackground=Styles.BORDER_COLOR,
+                highlightthickness=1
+            )
+            card.grid(row=row, column=col, padx=Styles.SPACING_LG, pady=Styles.SPACING_LG, sticky="nsew")
+            
+            # 卡片内容容器
+            content_frame = tk.Frame(card, bg=Styles.SURFACE_COLOR)
+            content_frame.pack(expand=True, fill=tk.BOTH)
+            
+            # 卡片内容 - 使用grid居中
+            content = tk.Frame(content_frame, bg=Styles.SURFACE_COLOR)
+            content.grid(row=0, column=0, sticky="nsew", padx=Styles.SPACING_2XL, pady=Styles.SPACING_2XL)
+            content_frame.grid_rowconfigure(0, weight=1)
+            content_frame.grid_columnconfigure(0, weight=1)
+            
+            # 图标 - 更大更醒目
+            icon_label = tk.Label(
+                content,
+                text=icon,
+                font=("微软雅黑", 48),
+                bg=Styles.SURFACE_COLOR,
+                fg=Styles.PRIMARY_COLOR
+            )
+            icon_label.pack()
+            
+            # 文本 - 更好的换行和间距
+            text_label = tk.Label(
+                content,
+                text=text,
+                font=Styles.TITLE_FONT,
+                bg=Styles.SURFACE_COLOR,
+                fg=Styles.TEXT_PRIMARY,
+                wraplength=180,
+                justify=tk.CENTER
+            )
+            text_label.pack(pady=(Styles.SPACING_LG, 0))
+            
+            # 使用默认参数绑定当前值
+            def make_on_enter(c=card, ct=content, il=icon_label, tl=text_label, cf=content_frame):
+                def on_enter(e):
+                    c.config(highlightbackground=Styles.PRIMARY_COLOR, bg=Styles.BORDER_LIGHT)
+                    cf.config(bg=Styles.BORDER_LIGHT)
+                    ct.config(bg=Styles.BORDER_LIGHT)
+                    il.config(bg=Styles.BORDER_LIGHT)
+                    tl.config(bg=Styles.BORDER_LIGHT)
+                return on_enter
+            
+            def make_on_leave(c=card, ct=content, il=icon_label, tl=text_label, cf=content_frame):
+                def on_leave(e):
+                    c.config(highlightbackground=Styles.BORDER_COLOR, bg=Styles.SURFACE_COLOR)
+                    cf.config(bg=Styles.SURFACE_COLOR)
+                    ct.config(bg=Styles.SURFACE_COLOR)
+                    il.config(bg=Styles.SURFACE_COLOR)
+                    tl.config(bg=Styles.SURFACE_COLOR)
+                return on_leave
+            
+            on_enter = make_on_enter()
+            on_leave = make_on_leave()
+            
+            card.bind("<Enter>", on_enter)
+            card.bind("<Leave>", on_leave)
+            content_frame.bind("<Enter>", on_enter)
+            content_frame.bind("<Leave>", on_leave)
+            content.bind("<Enter>", on_enter)
+            content.bind("<Leave>", on_leave)
+            icon_label.bind("<Enter>", on_enter)
+            icon_label.bind("<Leave>", on_leave)
+            text_label.bind("<Enter>", on_enter)
+            text_label.bind("<Leave>", on_leave)
+            
+            # 点击事件 - 同样用默认参数
+            def make_click(cmd=command):
+                def click(e):
+                    cmd()
+                return click
+            
+            click_handler = make_click()
+            
+            card.bind("<Button-1>", click_handler)
+            content_frame.bind("<Button-1>", click_handler)
+            content.bind("<Button-1>", click_handler)
+            icon_label.bind("<Button-1>", click_handler)
+            text_label.bind("<Button-1>", click_handler)
+        
+        return button_grid
+
+    def product_management(self):
+        """商品管理界面 - 现代化设计"""
+        self.clear_window()
+        
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
+        
+        # 页面标题
+        self._create_page_header(main_container, "商品管理", "管理您的茶叶商品库存")
+        
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
+        buttons = [
+            ("查看所有商品", self.view_all_products, "📋"),
+            ("添加商品", self.add_product_gui, "➕"),
+            ("修改商品", self.update_product_gui, "✏️"),
+            ("删除商品", self.delete_product_gui, "🗑️"),
+            ("按编号查询", self.query_product_by_id_gui, "🔍"),
+            ("按商品名查询", self.query_product_by_name_gui, "🔎")
+        ]
+        self._create_button_grid(buttons_container, buttons, columns=3)
+        
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
 
     def view_all_products(self):
         """查看所有商品"""
@@ -273,7 +570,7 @@ class TeaInventoryGUI:
         """添加商品GUI"""
         top = tk.Toplevel(self.root)
         top.title("添加商品")
-        top.geometry("900x750")
+        top.geometry("800x900")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -527,7 +824,7 @@ class TeaInventoryGUI:
             # 创建修改窗口
             edit_top = tk.Toplevel(top)
             edit_top.title("修改商品信息")
-            edit_top.geometry("900x750")
+            edit_top.geometry("900x800")
             edit_top.configure(bg=Styles.BACKGROUND_COLOR)
 
             # 创建标题区域
@@ -638,7 +935,7 @@ class TeaInventoryGUI:
         """删除商品GUI"""
         top = tk.Toplevel(self.root)
         top.title("删除商品")
-        top.geometry("400x300")
+        top.geometry("400x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -694,7 +991,7 @@ class TeaInventoryGUI:
         """按编号查询商品GUI"""
         top = tk.Toplevel(self.root)
         top.title("按编号查询商品")
-        top.geometry("400x300")
+        top.geometry("400x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -943,60 +1240,31 @@ class TeaInventoryGUI:
         tree.bind('<Double-1>', lambda e: show_detail())
 
     def sales_management(self):
-        """销售管理界面"""
+        """销售管理界面 - 现代化设计"""
         self.clear_window()
         
-        # 创建标题区域
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
         
-        tk.Label(
-            title_frame, 
-            text="销售管理", 
-            font=Styles.SUB_HEADER_FONT,
-            bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
-        ).pack()
-
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
+        # 页面标题
+        self._create_page_header(main_container, "销售管理", "处理客户订单和销售流程")
         
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
         buttons = [
-            ("添加商品到购物车", self.add_to_cart_gui),
-            ("查看购物车", self.view_cart_gui),
-            ("清空购物车", self.clear_cart_gui),
-            ("结账", self.checkout_gui),
-            ("返回主菜单", self.create_main_menu)
+            ("添加商品到购物车", self.add_to_cart_gui, "🛒"),
+            ("查看购物车", self.view_cart_gui, "📋"),
+            ("清空购物车", self.clear_cart_gui, "🗑️"),
+            ("结账", self.checkout_gui, "💳")
         ]
-
-        # 按2行3列排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 3
-            col = i % 3
-            
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
+        self._create_button_grid(buttons_container, buttons, columns=2)
+        
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
 
     def add_to_cart_gui(self):
         """添加商品到购物车GUI"""
@@ -1471,64 +1739,321 @@ class TeaInventoryGUI:
         btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
 
     def stock_management(self):
-        """进货管理界面"""
+        """进货管理界面 - 现代化设计"""
         self.clear_window()
         
-        # 创建标题区域
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
+        
+        # 页面标题
+        self._create_page_header(main_container, "进货管理", "管理商品入库和库存记录")
+        
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
+        buttons = [
+            ("进货入库", self.stock_in_gui, "📥"),
+            ("查看进货记录", self.view_all_stocks, "📋")
+        ]
+        self._create_button_grid(buttons_container, buttons, columns=2)
+        
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
+
+    def _select_product_dialog(self, target_var):
+        """商品选择弹窗 - 双击选择商品
+        
+        Args:
+            target_var: 要填充的StringVar变量
+        """
+        df = self.system.excel_manager.get_all_commodities()
+        
+        top = tk.Toplevel(self.root)
+        top.title("选择商品")
+        top.geometry("900x600")
+        top.configure(bg=Styles.BACKGROUND_COLOR)
+        
+        title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         title_frame.pack(pady=Styles.PADY_MEDIUM)
         
         tk.Label(
-            title_frame, 
-            text="进货管理", 
+            title_frame,
+            text="选择商品（双击选择）",
             font=Styles.SUB_HEADER_FONT,
             bg=Styles.BACKGROUND_COLOR,
             fg=Styles.HEADER_COLOR
         ).pack()
-
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
         
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-
-        buttons = [
-            ("进货入库", self.stock_in_gui),
-            ("查看进货记录", self.view_all_stocks),
-            ("返回主菜单", self.create_main_menu)
-        ]
-
-        # 按1行3列排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 3
-            col = i % 3
+        if df.empty:
+            tk.Label(top, text="暂无商品数据", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
             
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
+            btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            btn_frame.pack(pady=Styles.PADY_MEDIUM)
             
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
-
+            btn_add = tk.Button(btn_frame, text="手动添加商品", font=Styles.BUTTON_FONT,
+                               width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                               command=lambda: [top.destroy(), self.add_product_gui()],
+                               bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            btn_add.bind("<Enter>", lambda e, b=btn_add: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+            btn_add.bind("<Leave>", lambda e, b=btn_add: b.config(bg=Styles.PRIMARY_COLOR))
+            
+            btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                                   width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                                   command=top.destroy,
+                                   bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            return
+        
+        list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        list_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM, fill=tk.BOTH, expand=True)
+        
+        tree = ttk.Treeview(list_frame, style="Treeview", show="headings")
+        tree["columns"] = ("商品编号", "商品名称", "茶类", "品种", "当前库存", "零售价")
+        
+        for col in tree["columns"]:
+            tree.heading(col, text=col)
+            tree.column(col, width=140, anchor=tk.CENTER)
+        
+        scrollbar_y = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar_y.set)
+        
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        for _, row in df.iterrows():
+            tree.insert("", tk.END, values=(
+                row['商品编号'],
+                row['商品名称'],
+                row['茶类'],
+                row['品种'],
+                row['当前库存'],
+                row['零售价']
+            ))
+        
+        def on_double_click(event):
+            selection = tree.selection()
+            if selection:
+                item = tree.item(selection[0])
+                com_id = item['values'][0]
+                target_var.set(com_id)
+                top.destroy()
+        
+        tree.bind('<Double-1>', on_double_click)
+        
+        btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        btn_frame.pack(pady=Styles.PADY_MEDIUM)
+        
+        btn_add = tk.Button(btn_frame, text="手动添加商品", font=Styles.BUTTON_FONT,
+                           width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                           command=lambda: [top.destroy(), self.add_product_gui()],
+                           bg=Styles.SECONDARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+        btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+        
+        btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                               width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                               command=top.destroy,
+                               bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+        btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+    
+    def _select_supplier_dialog(self, target_var):
+        """供应商选择弹窗 - 双击选择供应商
+        
+        Args:
+            target_var: 要填充的StringVar变量
+        """
+        df = self.system.excel_manager.get_all_suppliers()
+        
+        top = tk.Toplevel(self.root)
+        top.title("选择供应商")
+        top.geometry("900x600")
+        top.configure(bg=Styles.BACKGROUND_COLOR)
+        
+        title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        
+        tk.Label(
+            title_frame,
+            text="选择供应商（双击选择）",
+            font=Styles.SUB_HEADER_FONT,
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.HEADER_COLOR
+        ).pack()
+        
+        if df.empty:
+            tk.Label(top, text="暂无供应商数据", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
+            
+            btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            btn_frame.pack(pady=Styles.PADY_MEDIUM)
+            
+            btn_add = tk.Button(btn_frame, text="手动添加供应商", font=Styles.BUTTON_FONT,
+                               width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                               command=lambda: [top.destroy(), self.add_supplier_gui()],
+                               bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            btn_add.bind("<Enter>", lambda e, b=btn_add: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+            btn_add.bind("<Leave>", lambda e, b=btn_add: b.config(bg=Styles.PRIMARY_COLOR))
+            
+            btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                                   width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                                   command=top.destroy,
+                                   bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            return
+        
+        list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        list_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM, fill=tk.BOTH, expand=True)
+        
+        tree = ttk.Treeview(list_frame, style="Treeview", show="headings")
+        tree["columns"] = ("供应商编号", "供应商名称", "联系电话", "地址", "累计交易金额")
+        
+        for col in tree["columns"]:
+            tree.heading(col, text=col)
+            tree.column(col, width=160, anchor=tk.CENTER)
+        
+        scrollbar_y = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar_y.set)
+        
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        for _, row in df.iterrows():
+            tree.insert("", tk.END, values=(
+                row.get('供应商编号', ''),
+                row.get('供应商名称', ''),
+                '' if pd.isna(row.get('联系电话')) else row.get('联系电话', ''),
+                '' if pd.isna(row.get('地址')) else row.get('地址', ''),
+                row.get('累计交易金额', 0) if pd.notna(row.get('累计交易金额')) else 0
+            ))
+        
+        def on_double_click(event):
+            selection = tree.selection()
+            if selection:
+                item = tree.item(selection[0])
+                supplier_name = item['values'][1]
+                target_var.set(supplier_name)
+                top.destroy()
+        
+        tree.bind('<Double-1>', on_double_click)
+        
+        btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        btn_frame.pack(pady=Styles.PADY_MEDIUM)
+        
+        btn_add = tk.Button(btn_frame, text="手动添加供应商", font=Styles.BUTTON_FONT,
+                           width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                           command=lambda: [top.destroy(), self.add_supplier_gui()],
+                           bg=Styles.SECONDARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+        btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+        
+        btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                               width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                               command=top.destroy,
+                               bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+        btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+    
+    def _select_customer_dialog(self, target_var):
+        """客户选择弹窗 - 双击选择客户
+        
+        Args:
+            target_var: 要填充的StringVar变量
+        """
+        df = self.system.excel_manager.get_all_customers()
+        
+        top = tk.Toplevel(self.root)
+        top.title("选择客户")
+        top.geometry("900x600")
+        top.configure(bg=Styles.BACKGROUND_COLOR)
+        
+        title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        
+        tk.Label(
+            title_frame,
+            text="选择客户（双击选择）",
+            font=Styles.SUB_HEADER_FONT,
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.HEADER_COLOR
+        ).pack()
+        
+        if df.empty:
+            tk.Label(top, text="暂无客户数据", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
+            
+            btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            btn_frame.pack(pady=Styles.PADY_MEDIUM)
+            
+            btn_add = tk.Button(btn_frame, text="手动添加客户", font=Styles.BUTTON_FONT,
+                               width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                               command=lambda: [top.destroy(), self.add_customer_gui()],
+                               bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            btn_add.bind("<Enter>", lambda e, b=btn_add: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+            btn_add.bind("<Leave>", lambda e, b=btn_add: b.config(bg=Styles.PRIMARY_COLOR))
+            
+            btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                                   width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                                   command=top.destroy,
+                                   bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            return
+        
+        list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        list_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM, fill=tk.BOTH, expand=True)
+        
+        tree = ttk.Treeview(list_frame, style="Treeview", show="headings")
+        tree["columns"] = ("客户编号", "客户名称", "联系电话", "地址", "累计消费")
+        
+        for col in tree["columns"]:
+            tree.heading(col, text=col)
+            tree.column(col, width=160, anchor=tk.CENTER)
+        
+        scrollbar_y = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
+        tree.configure(yscrollcommand=scrollbar_y.set)
+        
+        scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
+        tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        for _, row in df.iterrows():
+            tree.insert("", tk.END, values=(
+                row.get('客户编号', ''),
+                row.get('客户名称', ''),
+                '' if pd.isna(row.get('联系电话')) else row.get('联系电话', ''),
+                '' if pd.isna(row.get('地址')) else row.get('地址', ''),
+                row.get('累计消费', 0) if pd.notna(row.get('累计消费')) else 0
+            ))
+        
+        def on_double_click(event):
+            selection = tree.selection()
+            if selection:
+                item = tree.item(selection[0])
+                customer_name = item['values'][1]
+                target_var.set(customer_name)
+                top.destroy()
+        
+        tree.bind('<Double-1>', on_double_click)
+        
+        btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        btn_frame.pack(pady=Styles.PADY_MEDIUM)
+        
+        btn_add = tk.Button(btn_frame, text="手动添加客户", font=Styles.BUTTON_FONT,
+                           width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                           command=lambda: [top.destroy(), self.add_customer_gui()],
+                           bg=Styles.SECONDARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+        btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+        
+        btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
+                               width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
+                               command=top.destroy,
+                               bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+        btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+    
     def stock_in_gui(self):
         """进货入库GUI"""
         top = tk.Toplevel(self.root)
         top.title("进货入库")
-        top.geometry("800x600")
+        top.geometry("700x700")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -1543,78 +2068,68 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        # 显示历史进货记录
-        df_stocks = self.system.excel_manager.get_all_stocks()
-        if not df_stocks.empty:
-            tk.Label(top, text="历史进货记录", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
-            
-            list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-            list_frame.pack(pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
-            
-            listbox = tk.Listbox(list_frame, width=80, height=10, font=Styles.TEXT_FONT)
-            listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-            
-            scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=listbox.yview)
-            scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
-            listbox.config(yscrollcommand=scrollbar.set)
-            
-            for idx, (_, row) in enumerate(df_stocks.iterrows(), 1):
-                item_text = f"{idx}. {row['商品名称']} (编号: {row['商品编号']}) - 数量: {row['进货数量']} {row['进货单位']} - 供应商: {row['供应商']}"
-                listbox.insert(tk.END, item_text)
-
         # 输入表单
         form_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        form_frame.pack(pady=Styles.PADY_MEDIUM)
+        form_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM)
 
         # 商品编号
-        tk.Label(form_frame, text="商品编号 (留空选择历史记录)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=5)
+        tk.Label(form_frame, text="商品编号", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=8)
         com_id_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=com_id_var, width=30, font=Styles.TEXT_FONT).grid(row=0, column=1, pady=5)
+        com_id_entry = tk.Entry(form_frame, textvariable=com_id_var, width=25, font=Styles.TEXT_FONT)
+        com_id_entry.grid(row=0, column=1, pady=8, padx=5)
+        
+        btn_select_product = tk.Button(form_frame, text="选择...", font=Styles.BUTTON_FONT,
+                                      width=10, command=lambda: self._select_product_dialog(com_id_var),
+                                      bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=3)
+        btn_select_product.grid(row=0, column=2, pady=8)
+        btn_select_product.bind("<Enter>", lambda e, b=btn_select_product: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+        btn_select_product.bind("<Leave>", lambda e, b=btn_select_product: b.config(bg=Styles.PRIMARY_COLOR))
 
         # 进货单价
-        tk.Label(form_frame, text="进货单价(每斤)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=1, column=0, sticky='w', pady=5)
+        tk.Label(form_frame, text="进货单价(每斤)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=1, column=0, sticky='w', pady=8)
         unit_price_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=unit_price_var, width=30, font=Styles.TEXT_FONT).grid(row=1, column=1, pady=5)
+        tk.Entry(form_frame, textvariable=unit_price_var, width=25, font=Styles.TEXT_FONT).grid(row=1, column=1, pady=8, padx=5)
 
         # 进货数量
-        tk.Label(form_frame, text="进货数量", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=2, column=0, sticky='w', pady=5)
+        tk.Label(form_frame, text="进货数量", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=2, column=0, sticky='w', pady=8)
         quantity_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=quantity_var, width=30, font=Styles.TEXT_FONT).grid(row=2, column=1, pady=5)
+        tk.Entry(form_frame, textvariable=quantity_var, width=25, font=Styles.TEXT_FONT).grid(row=2, column=1, pady=8, padx=5)
 
         # 进货单位
-        tk.Label(form_frame, text="进货单位 (斤/克)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=3, column=0, sticky='w', pady=5)
+        tk.Label(form_frame, text="进货单位 (斤/克)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=3, column=0, sticky='w', pady=8)
         unit_var = tk.StringVar(value="斤")
-        tk.Entry(form_frame, textvariable=unit_var, width=30, font=Styles.TEXT_FONT).grid(row=3, column=1, pady=5)
+        tk.Entry(form_frame, textvariable=unit_var, width=25, font=Styles.TEXT_FONT).grid(row=3, column=1, pady=8, padx=5)
 
         # 供应商
-        tk.Label(form_frame, text="供应商", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=4, column=0, sticky='w', pady=5)
+        tk.Label(form_frame, text="供应商", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=4, column=0, sticky='w', pady=8)
         supplier_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=supplier_var, width=30, font=Styles.TEXT_FONT).grid(row=4, column=1, pady=5)
+        supplier_entry = tk.Entry(form_frame, textvariable=supplier_var, width=25, font=Styles.TEXT_FONT)
+        supplier_entry.grid(row=4, column=1, pady=8, padx=5)
+        
+        btn_select_supplier = tk.Button(form_frame, text="选择...", font=Styles.BUTTON_FONT,
+                                        width=10, command=lambda: self._select_supplier_dialog(supplier_var),
+                                        bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=3)
+        btn_select_supplier.grid(row=4, column=2, pady=8)
+        btn_select_supplier.bind("<Enter>", lambda e, b=btn_select_supplier: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+        btn_select_supplier.bind("<Leave>", lambda e, b=btn_select_supplier: b.config(bg=Styles.PRIMARY_COLOR))
 
         # 进货日期
-        tk.Label(form_frame, text="进货日期 (YYYY-MM-DD)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=5, column=0, sticky='w', pady=5)
+        tk.Label(form_frame, text="进货日期 (YYYY-MM-DD)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=5, column=0, sticky='w', pady=8)
         stock_date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
-        tk.Entry(form_frame, textvariable=stock_date_var, width=30, font=Styles.TEXT_FONT).grid(row=5, column=1, pady=5)
+        tk.Entry(form_frame, textvariable=stock_date_var, width=25, font=Styles.TEXT_FONT).grid(row=5, column=1, pady=8, padx=5)
 
         # 备注
-        tk.Label(form_frame, text="备注", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=6, column=0, sticky='w', pady=5)
+        tk.Label(form_frame, text="备注", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=6, column=0, sticky='w', pady=8)
         remarks_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=remarks_var, width=30, font=Styles.TEXT_FONT).grid(row=6, column=1, pady=5)
+        tk.Entry(form_frame, textvariable=remarks_var, width=25, font=Styles.TEXT_FONT).grid(row=6, column=1, pady=8, padx=5)
 
         def submit():
             try:
                 com_id = com_id_var.get().strip()
                 
-                if not com_id and not df_stocks.empty:
-                    # 从历史记录选择
-                    selection = listbox.curselection()
-                    if selection:
-                        idx = selection[0]
-                        selected_product = df_stocks.iloc[idx]
-                        com_id = selected_product['商品编号']
-                    else:
-                        messagebox.showerror("错误", "请输入商品编号或选择历史记录")
-                        return
+                if not com_id:
+                    messagebox.showerror("错误", "请选择或输入商品编号")
+                    return
                 
                 commodity = self.system.excel_manager.get_commodity_by_id(com_id)
                 if commodity is None:
@@ -1646,7 +2161,8 @@ class TeaInventoryGUI:
                 self.system.excel_manager.add_stock(stock_record.to_list())
                 
                 # 更新供应商信息
-                self.system.excel_manager.update_supplier_after_stock(supplier, quantity * unit_price, stock_date)
+                if supplier:
+                    self.system.excel_manager.update_supplier_after_stock(supplier, quantity * unit_price, stock_date)
                 
                 messagebox.showinfo("成功", f"进货入库成功！\n进货编号: {stock_id}")
                 top.destroy()
@@ -1656,7 +2172,7 @@ class TeaInventoryGUI:
                 messagebox.showerror("错误", f"进货失败: {e}")
 
         btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        btn_frame.pack(pady=Styles.PADY_MEDIUM)
+        btn_frame.pack(pady=Styles.PADY_LARGE)
 
         btn_confirm = tk.Button(btn_frame, text="确认进货", font=Styles.BUTTON_FONT,
                   width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=submit,
@@ -1676,58 +2192,31 @@ class TeaInventoryGUI:
         self.show_dataframe_window(df, "进货记录列表")
 
     def supplier_management(self):
-        """供应商管理界面"""
+        """供应商管理界面 - 现代化设计"""
         self.clear_window()
         
-        # 创建标题区域
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
         
-        tk.Label(
-            title_frame, 
-            text="供应商管理", 
-            font=Styles.SUB_HEADER_FONT,
-            bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
-        ).pack()
-
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
+        # 页面标题
+        self._create_page_header(main_container, "供应商管理", "管理您的供应商信息")
         
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
         buttons = [
-            ("查看所有供应商", self.view_all_suppliers),
-            ("添加供应商", self.add_supplier_gui),
-            ("返回主菜单", self.create_main_menu)
+            ("查看所有供应商", self.view_all_suppliers, "📋"),
+            ("添加供应商", self.add_supplier_gui, "➕"),
+            ("修改供应商", self.update_supplier_gui, "✏️"),
+            ("删除供应商", self.delete_supplier_gui, "🗑️")
         ]
-
-        # 按1行3列排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 3
-            col = i % 3
-            
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
+        self._create_button_grid(buttons_container, buttons, columns=2)
+        
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
 
     def view_all_suppliers(self):
         df = self.system.excel_manager.get_all_suppliers()
@@ -1746,7 +2235,7 @@ class TeaInventoryGUI:
         """添加供应商GUI"""
         top = tk.Toplevel(self.root)
         top.title("添加供应商")
-        top.geometry("600x400")
+        top.geometry("600x500")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -2035,58 +2524,31 @@ class TeaInventoryGUI:
         btn_cancel.bind("<Leave>", lambda e, b=btn_cancel: b.config(bg=Styles.PRIMARY_COLOR))
 
     def customer_management(self):
-        """客户管理界面"""
+        """客户管理界面 - 现代化设计"""
         self.clear_window()
         
-        # 创建标题区域
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
         
-        tk.Label(
-            title_frame, 
-            text="客户管理", 
-            font=Styles.SUB_HEADER_FONT,
-            bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
-        ).pack()
-
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
+        # 页面标题
+        self._create_page_header(main_container, "客户管理", "管理您的客户信息")
         
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
         buttons = [
-            ("查看所有客户", self.view_all_customers),
-            ("添加客户", self.add_customer_gui),
-            ("返回主菜单", self.create_main_menu)
+            ("查看所有客户", self.view_all_customers, "📋"),
+            ("添加客户", self.add_customer_gui, "➕"),
+            ("修改客户", self.update_customer_gui, "✏️"),
+            ("删除客户", self.delete_customer_gui, "🗑️")
         ]
-
-        # 按1行3列排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 3
-            col = i % 3
-            
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
+        self._create_button_grid(buttons_container, buttons, columns=2)
+        
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
 
     def view_all_customers(self):
         df = self.system.excel_manager.get_all_customers()
@@ -2398,60 +2860,31 @@ class TeaInventoryGUI:
         self.show_dataframe_window(df, "客户列表")
 
     def sales_record_management(self):
-        """销售记录管理界面"""
+        """销售记录管理界面 - 现代化设计"""
         self.clear_window()
         
-        # 创建标题区域
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
         
-        tk.Label(
-            title_frame, 
-            text="销售记录管理", 
-            font=Styles.SUB_HEADER_FONT,
-            bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
-        ).pack()
-
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
+        # 页面标题
+        self._create_page_header(main_container, "销售记录管理", "查看和查询历史销售记录")
         
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
         buttons = [
-            ("查看所有销售记录", self.view_all_sales),
-            ("按客户查询", self.query_sales_by_customer_gui),
-            ("按商品查询", self.query_sales_by_product_gui),
-            ("按日期查询", self.query_sales_by_date_gui),
-            ("返回主菜单", self.create_main_menu)
+            ("查看所有销售记录", self.view_all_sales, "📋"),
+            ("按客户查询", self.query_sales_by_customer_gui, "👥"),
+            ("按商品查询", self.query_sales_by_product_gui, "📦"),
+            ("按日期查询", self.query_sales_by_date_gui, "📅")
         ]
-
-        # 按2行3列排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 3
-            col = i % 3
-            
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
+        self._create_button_grid(buttons_container, buttons, columns=2)
+        
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
 
     def view_all_sales(self):
         df = self.system.excel_manager.get_all_sales()
@@ -2461,7 +2894,7 @@ class TeaInventoryGUI:
         """按客户查询销售记录GUI"""
         top = tk.Toplevel(self.root)
         top.title("按客户查询销售记录")
-        top.geometry("400x300")
+        top.geometry("600x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -2476,14 +2909,26 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        tk.Label(top, text="请输入客户名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+        # 客户名称输入区域
+        input_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        input_frame.pack(pady=Styles.PADY_LARGE)
+        
+        tk.Label(input_frame, text="客户名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=8)
         customer_var = tk.StringVar()
-        tk.Entry(top, textvariable=customer_var, font=Styles.TEXT_FONT, width=30).pack(pady=Styles.PADY_SMALL)
+        customer_entry = tk.Entry(input_frame, textvariable=customer_var, font=Styles.TEXT_FONT, width=25)
+        customer_entry.grid(row=0, column=1, pady=8, padx=5)
+        
+        btn_select_customer = tk.Button(input_frame, text="选择...", font=Styles.BUTTON_FONT,
+                                        width=10, command=lambda: self._select_customer_dialog(customer_var),
+                                        bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=3)
+        btn_select_customer.grid(row=0, column=2, pady=8)
+        btn_select_customer.bind("<Enter>", lambda e, b=btn_select_customer: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+        btn_select_customer.bind("<Leave>", lambda e, b=btn_select_customer: b.config(bg=Styles.PRIMARY_COLOR))
 
         def query():
             customer_name = customer_var.get().strip()
             if not customer_name:
-                messagebox.showerror("错误", "请输入客户名称")
+                messagebox.showerror("错误", "请选择或输入客户名称")
                 return
 
             df = self.system.excel_manager.get_all_sales()
@@ -2516,7 +2961,7 @@ class TeaInventoryGUI:
         """按商品查询销售记录GUI"""
         top = tk.Toplevel(self.root)
         top.title("按商品查询销售记录")
-        top.geometry("400x300")
+        top.geometry("600x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -2531,14 +2976,26 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        tk.Label(top, text="请输入商品编号", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+        # 商品编号输入区域
+        input_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        input_frame.pack(pady=Styles.PADY_LARGE)
+        
+        tk.Label(input_frame, text="商品编号", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=8)
         product_var = tk.StringVar()
-        tk.Entry(top, textvariable=product_var, font=Styles.TEXT_FONT, width=30).pack(pady=Styles.PADY_SMALL)
+        product_entry = tk.Entry(input_frame, textvariable=product_var, font=Styles.TEXT_FONT, width=25)
+        product_entry.grid(row=0, column=1, pady=8, padx=5)
+        
+        btn_select_product = tk.Button(input_frame, text="选择...", font=Styles.BUTTON_FONT,
+                                       width=10, command=lambda: self._select_product_dialog(product_var),
+                                       bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=3)
+        btn_select_product.grid(row=0, column=2, pady=8)
+        btn_select_product.bind("<Enter>", lambda e, b=btn_select_product: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+        btn_select_product.bind("<Leave>", lambda e, b=btn_select_product: b.config(bg=Styles.PRIMARY_COLOR))
 
         def query():
             product_id = product_var.get().strip()
             if not product_id:
-                messagebox.showerror("错误", "请输入商品编号")
+                messagebox.showerror("错误", "请选择或输入商品编号")
                 return
 
             df = self.system.excel_manager.get_all_sales()
@@ -2633,60 +3090,31 @@ class TeaInventoryGUI:
         btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
 
     def statistics_analysis(self):
-        """统计分析界面"""
+        """统计分析界面 - 现代化设计"""
         self.clear_window()
         
-        # 创建标题区域
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
         
-        tk.Label(
-            title_frame, 
-            text="统计分析", 
-            font=Styles.SUB_HEADER_FONT,
-            bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
-        ).pack()
-
-        # 创建按钮区域
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM, fill=tk.X)
+        # 页面标题
+        self._create_page_header(main_container, "统计分析", "数据分析和可视化报表")
         
-        # 创建按钮网格
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(padx=Styles.PADX_LARGE)
-
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
         buttons = [
-            ("销售统计", self.sales_statistics_gui),
-            ("热销商品排行", self.top_selling_products_gui),
-            ("盈利分析", self.profit_analysis_gui),
-            ("数据可视化", self.data_visualization_gui),
-            ("返回主菜单", self.create_main_menu)
+            ("销售统计", self.sales_statistics_gui, "📈"),
+            ("热销商品排行", self.top_selling_products_gui, "🏆"),
+            ("盈利分析", self.profit_analysis_gui, "💰"),
+            ("数据可视化", self.data_visualization_gui, "📊")
         ]
-
-        # 按2行3列排列按钮
-        for i, (text, command) in enumerate(buttons):
-            row = i // 3
-            col = i % 3
-            
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            # 添加悬停效果
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
+        self._create_button_grid(buttons_container, buttons, columns=2)
+        
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
 
     def sales_statistics_gui(self):
         """销售统计GUI"""
@@ -3020,43 +3448,56 @@ class TeaInventoryGUI:
             messagebox.showerror("错误", f"分析失败: {e}")
 
     def data_visualization_gui(self):
-        """数据可视化GUI"""
+        """数据可视化GUI - 现代化设计"""
         top = tk.Toplevel(self.root)
         top.title("数据可视化")
-        top.geometry("800x600")
+        top.geometry("900x650")
         top.configure(bg=Styles.BACKGROUND_COLOR)
-
-        tk.Label(top, text="选择可视化类型", font=Styles.SUB_HEADER_FONT,
-                 bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.PADY_LARGE)
-
-        frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        frame.pack(pady=Styles.PADY_MEDIUM)
         
-        button_grid = tk.Frame(frame, bg=Styles.BACKGROUND_COLOR)
+        # 主容器
+        main_container = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL, pady=Styles.SPACING_XL)
+        
+        # 标题
+        tk.Label(
+            main_container,
+            text="选择可视化类型",
+            font=Styles.SUB_HEADER_FONT,
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.TEXT_PRIMARY
+        ).pack(pady=(0, Styles.SPACING_LG))
+        
+        # 按钮网格
+        button_grid = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
         button_grid.pack()
-
+        
         buttons = [
-            ("销售趋势图", self.show_sales_trend_options),
-            ("商品销量饼图", lambda: self.system.data_viz.plot_product_sales_pie()),
-            ("利润趋势图", self.show_profit_trend_options),
-            ("茶类销售对比图", lambda: self.system.data_viz.plot_tea_category_sales())
+            ("📈 销售趋势图", self.show_sales_trend_options),
+            ("🥧 商品销量饼图", lambda: self.system.data_viz.plot_product_sales_pie()),
+            ("💰 商品利润饼图", lambda: self.system.data_viz.plot_product_profit_pie()),
+            ("📊 利润趋势图", self.show_profit_trend_options),
+            ("🍵 茶类销售对比图", lambda: self.system.data_viz.plot_tea_category_sales())
         ]
-
+        
         for i, (text, command) in enumerate(buttons):
-            row = i // 2
-            col = i % 2
-            btn = tk.Button(button_grid, text=text, font=Styles.BUTTON_FONT,
-                            width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
-                            command=command, bg=Styles.PRIMARY_COLOR, fg="white",
-                            relief=tk.FLAT, padx=10, pady=5)
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            btn.grid(row=row, column=col, padx=Styles.PADX_SMALL, pady=Styles.PADY_SMALL)
-
-        tk.Button(top, text="关闭", font=Styles.BUTTON_FONT,
-                  width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT,
-                  command=top.destroy, bg=Styles.ERROR_COLOR, fg="white",
-                  relief=tk.FLAT, padx=10, pady=5).pack(pady=Styles.PADY_LARGE)
+            row = i // 3
+            col = i % 3
+            btn = ttk.Button(
+                button_grid,
+                text=text,
+                command=command,
+                style="Modern.TButton"
+            )
+            btn.grid(row=row, column=col, padx=Styles.SPACING_SM, pady=Styles.SPACING_SM, sticky="ew")
+            button_grid.grid_columnconfigure(col, weight=1)
+        
+        # 关闭按钮
+        ttk.Button(
+            main_container,
+            text="关闭",
+            command=top.destroy,
+            style="Danger.TButton"
+        ).pack(pady=(Styles.SPACING_XL, 0))
     
     def show_sales_trend_options(self):
         """显示销售趋势图选项"""
@@ -3759,51 +4200,46 @@ class TeaInventoryGUI:
         ).pack(side=tk.LEFT, padx=10)
 
     def system_management(self):
-        """系统管理界面"""
+        """系统管理界面 - 现代化设计"""
         self.clear_window()
         
-        title_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_LARGE)
+        # 调整窗口高度，增加200
+        self.root.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT + 200}")
         
-        tk.Label(
-            title_frame, 
-            text="系统管理", 
-            font=Styles.HEADER_FONT,
-            bg=Styles.BACKGROUND_COLOR,
-            fg=Styles.HEADER_COLOR
+        # 主容器
+        main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
+        
+        # 页面标题
+        self._create_page_header(main_container, "系统管理", "备份、同步和日志管理")
+        
+        # 按钮区域容器
+        buttons_container = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
+        buttons_container.pack(fill=tk.BOTH, expand=True)
+        
+        # 按钮网格
+        buttons = [
+            ("数据备份管理", self.backup_management, "💾"),
+            ("云端同步管理", self.cloud_sync_management, "☁️"),
+            ("操作日志查询", self.log_management, "📝")
+        ]
+        self._create_button_grid(buttons_container, buttons, columns=2)
+        
+        # 分隔线
+        ttk.Separator(buttons_container, orient='horizontal').pack(fill='x', pady=Styles.SPACING_LG)
+        
+        # 退出按钮
+        exit_frame = tk.Frame(buttons_container, bg=Styles.BACKGROUND_COLOR)
+        exit_frame.pack(pady=Styles.SPACING_MD)
+        ttk.Button(
+            exit_frame,
+            text="退出系统",
+            command=self.root.quit,
+            style="Danger.TButton"
         ).pack()
         
-        buttons_frame = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        buttons_frame.pack(pady=Styles.PADY_MEDIUM)
-        
-        button_grid = tk.Frame(buttons_frame, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack()
-        
-        buttons = [
-            ("数据备份管理", self.backup_management),
-            ("云端同步管理", self.cloud_sync_management),
-            ("操作日志查询", self.log_management),
-            ("返回主菜单", self.create_main_menu),
-            ("退出系统", self.root.quit)
-        ]
-        
-        for i, (text, command) in enumerate(buttons):
-            btn = tk.Button(
-                button_grid, 
-                text=text, 
-                font=Styles.BUTTON_FONT,
-                width=Styles.BUTTON_WIDTH,
-                height=Styles.BUTTON_HEIGHT,
-                command=command,
-                bg=Styles.PRIMARY_COLOR,
-                fg="white",
-                relief=tk.FLAT,
-                padx=10,
-                pady=5
-            )
-            btn.bind("<Enter>", lambda e, b=btn: b.config(bg=Styles.BUTTON_HOVER_COLOR))
-            btn.bind("<Leave>", lambda e, b=btn: b.config(bg=Styles.PRIMARY_COLOR))
-            btn.grid(row=i, column=0, pady=Styles.PADY_SMALL)
+        # 返回按钮
+        self._create_back_button(main_container, self.create_main_menu)
     
     def backup_management(self):
         """数据备份管理界面"""
