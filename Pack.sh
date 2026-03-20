@@ -1,0 +1,1 @@
+tea_venv\Scripts\python.exe -m PyInstaller --onedir --windowed --name tea_inventory gui_app.py
