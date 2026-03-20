@@ -876,7 +876,7 @@ class TeaInventoryGUI:
                         if key in ['成本价', '零售价', '当前库存']:
                             updates[key] = float(value)
                         elif key in ['保质期(月)', '年份']:
-                            updates[key] = int(value)
+                            updates[key] = int(float(value))
                         else:
                             updates[key] = value
 
@@ -3861,7 +3861,7 @@ class TeaInventoryGUI:
                 com_id = values[com_id_idx]
                 
                 commodity = self.system.excel_manager.get_commodity_by_id(com_id)
-                if commodity:
+                if commodity is not None:
                     info_top = tk.Toplevel(top)
                     info_top.title("商品详情")
                     info_top.geometry("700x500")
