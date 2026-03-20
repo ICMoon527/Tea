@@ -82,7 +82,7 @@ class DataVisualization:
         Args:
             period: 'day'按日, 'week'按周, 'month'按月
         """
-        df = self.excel_manager.get_all_sales()
+        df = self.excel_manager.get_all_sales(include_voided=False)
         if df.empty:
             print("暂无销售记录")
             return
@@ -141,7 +141,7 @@ class DataVisualization:
 
     def plot_product_sales_pie(self):
         """绘制商品销量饼图 - SCI论文标准"""
-        df = self.excel_manager.get_all_sales()
+        df = self.excel_manager.get_all_sales(include_voided=False)
         if df.empty:
             print("暂无销售记录")
             return
@@ -183,18 +183,11 @@ class DataVisualization:
 
     def plot_product_profit_pie(self):
         """绘制商品利润饼图 - SCI论文标准"""
-        df_sales = self.excel_manager.get_all_sales()
+        df_sales = self.excel_manager.get_all_sales(include_voided=False)
         df_products = self.excel_manager.get_all_commodities()
 
         if df_sales.empty or df_products.empty:
             print("数据不足")
-            return
-
-        if '是否作废' in df_sales.columns:
-            df_sales = df_sales[df_sales['是否作废'] != True]
-
-        if df_sales.empty:
-            print("暂无有效销售记录")
             return
 
         merged = pd.merge(df_sales, df_products[['商品编号', '成本价']], on='商品编号', how='left')
@@ -238,7 +231,7 @@ class DataVisualization:
 
     def plot_profit_trend(self, period='month'):
         """绘制利润趋势图 - SCI论文标准"""
-        df_sales = self.excel_manager.get_all_sales()
+        df_sales = self.excel_manager.get_all_sales(include_voided=False)
         df_products = self.excel_manager.get_all_commodities()
 
         if df_sales.empty or df_products.empty:
@@ -311,7 +304,7 @@ class DataVisualization:
 
     def plot_tea_category_sales(self):
         """绘制茶类销售对比图 - SCI论文标准"""
-        df_sales = self.excel_manager.get_all_sales()
+        df_sales = self.excel_manager.get_all_sales(include_voided=False)
         df_products = self.excel_manager.get_all_commodities()
 
         if df_sales.empty or df_products.empty:

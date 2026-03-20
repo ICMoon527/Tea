@@ -678,7 +678,7 @@ class TeaInventorySystem:
     # 统计分析功能
     def sales_statistics(self):
         """销售统计"""
-        df = self.excel_manager.get_all_sales()
+        df = self.excel_manager.get_all_sales(include_voided=False)
         if df.empty or len(df) <= 0:  # 修改条件，不再需要判断<=1
             print("暂无销售记录")
             return
@@ -876,7 +876,7 @@ class TeaInventorySystem:
     
     def top_selling_products(self):
         """热销商品排行"""
-        df = self.excel_manager.get_all_sales()
+        df = self.excel_manager.get_all_sales(include_voided=False)
         if df.empty or len(df) <= 0:  # 修改条件
             print("暂无销售记录")
             return
@@ -918,7 +918,7 @@ class TeaInventorySystem:
     
     def profit_analysis(self):
         """盈利分析"""
-        df = self.excel_manager.get_all_sales()
+        df = self.excel_manager.get_all_sales(include_voided=False)
         if df.empty or len(df) <= 0:  # 修改条件
             print("暂无销售记录")
             return
@@ -1308,7 +1308,7 @@ class TeaInventorySystem:
 
     def view_all_sales(self):
         """查看所有销售记录"""
-        df = self.excel_manager.get_all_sales()
+        df = self.excel_manager.get_all_sales(include_voided=False)
         if df.empty:
             print("暂无销售记录")
             return
