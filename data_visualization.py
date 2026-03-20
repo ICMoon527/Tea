@@ -87,13 +87,6 @@ class DataVisualization:
             print("暂无销售记录")
             return
 
-        if '是否作废' in df.columns:
-            df = df[df['是否作废'] != True]
-
-        if df.empty:
-            print("暂无有效销售记录")
-            return
-
         df['销售日期'] = pd.to_datetime(df['销售日期'])
 
         if period == 'day':
@@ -151,13 +144,6 @@ class DataVisualization:
         df = self.excel_manager.get_all_sales()
         if df.empty:
             print("暂无销售记录")
-            return
-
-        if '是否作废' in df.columns:
-            df = df[df['是否作废'] != True]
-
-        if df.empty:
-            print("暂无有效销售记录")
             return
 
         def get_qty_jin(row):
@@ -259,13 +245,6 @@ class DataVisualization:
             print("数据不足")
             return
 
-        if '是否作废' in df_sales.columns:
-            df_sales = df_sales[df_sales['是否作废'] != True]
-
-        if df_sales.empty:
-            print("暂无有效销售记录")
-            return
-
         df_sales['销售日期'] = pd.to_datetime(df_sales['销售日期'])
 
         merged = pd.merge(df_sales, df_products[['商品编号', '成本价']], on='商品编号', how='left')
@@ -337,13 +316,6 @@ class DataVisualization:
 
         if df_sales.empty or df_products.empty:
             print("数据不足")
-            return
-
-        if '是否作废' in df_sales.columns:
-            df_sales = df_sales[df_sales['是否作废'] != True]
-
-        if df_sales.empty:
-            print("暂无有效销售记录")
             return
 
         merged = pd.merge(df_sales, df_products[['商品编号', '茶类']], on='商品编号', how='left')

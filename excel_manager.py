@@ -232,8 +232,23 @@ class ExcelManager:
         return True
     
     # 销售相关操作
-    def get_all_sales(self):
-        return self.read_sheet("销售记录")
+    def get_all_sales(self, include_voided=False):
+        """获取所有销售记录
+        
+        Args:
+            include_voided: 是否包含作废记录，默认为 False
+            
+        Returns:
+            销售记录 DataFrame
+        """
+        df = self.read_sheet("销售记录")
+        
+        if not include_voided and not df.empty:
+            # 过滤掉作废记录
+            if '是否作废' in df.columns:
+                df = df[df['是否作废'] != True]
+        
+        return df
     
     def add_sale(self, sale_data):
         self.append_to_sheet("销售记录", sale_data)
@@ -541,15 +556,28 @@ class ExcelManager:
         return result.iloc[0] if not result.empty else None
 
     def query_sales(self, start_date=None, end_date=None, customer_name=None,
-                    com_id=None, com_name=None):
-        """多条件查询销售记录"""
+                    com_id=None, com_name=None, include_voided=False):
+        """多条件查询销售记录
+        
+        Args:
+            start_date: 开始日期
+            end_date: 结束日期
+            customer_name: 客户名称
+            com_id: 商品编号
+            com_name: 商品名称
+            include_voided: 是否包含作废记录，默认为 False
+            
+        Returns:
+            查询结果 DataFrame
+        """
         df = self.read_sheet("销售记录")
         if df.empty:
             return df
 
-        # 过滤掉作废记录
-        if '是否作废' in df.columns:
-            df = df[df['是否作废'] != True]
+        # 统一过滤作废记录
+        if not include_voided:
+            if '是否作废' in df.columns:
+                df = df[df['是否作废'] != True]
 
         # 按日期范围过滤
         if start_date:

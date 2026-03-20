@@ -1313,14 +1313,6 @@ class TeaInventorySystem:
             print("暂无销售记录")
             return
 
-        # 过滤作废记录
-        if '是否作废' in df.columns:
-            df = df[df['是否作废'] != True]
-
-        if df.empty:
-            print("暂无有效销售记录")
-            return
-
         table = PrettyTable()
         table.field_names = df.columns.tolist()
 
