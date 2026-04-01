@@ -1,0 +1,98 @@
+{
+  "app": {
+    "name": "茶叶进销存管理系统",
+    "version": "6.0",
+    "language": "zh_CN"
+  },
+  "data": {
+    "excel_file": "tea_inventory.xlsx",
+    "backup_dir": "backups",
+    "max_backups": 7,
+    "log_file": "operation_logs.xlsx"
+  },
+  "alerts": {
+    "low_stock_threshold": 1.0,
+    "expiry_warning_days": 30,
+    "check_on_startup": true
+  },
+  "ui": {
+    "theme": "default",
+    "window_width": 1200,
+    "window_height": 800,
+    "show_status_bar": true
+  },
+  "window_sizes": {
+    "sales_statistics": {
+      "width": 760,
+      "height": 580
+    },
+    "main_window": {
+      "width": 1280,
+      "height": 700
+    },
+    "sales_trend_options": {
+      "width": 504,
+      "height": 587
+    },
+    "data_visualization": {
+      "width": 681,
+      "height": 353
+    },
+    "profit_trend_options": {
+      "width": 472,
+      "height": 586
+    },
+    "statistics_by_time": {
+      "width": 875,
+      "height": 430
+    },
+    "add_product": {
+      "width": 552,
+      "height": 678
+    },
+    "update_product": {
+      "width": 760,
+      "height": 550
+    },
+    "add_to_cart": {
+      "width": 1000,
+      "height": 680
+    },
+    "view_cart": {
+      "width": 900,
+      "height": 650
+    },
+    "checkout": {
+      "width": 800,
+      "height": 700
+    },
+    "add_supplier": {
+      "width": 560,
+      "height": 432
+    },
+    "update_supplier": {
+      "width": 500,
+      "height": 320
+    },
+    "delete_supplier": {
+      "width": 500,
+      "height": 320
+    },
+    "add_customer": {
+      "width": 577,
+      "height": 422
+    },
+    "update_customer": {
+      "width": 500,
+      "height": 320
+    },
+    "delete_customer": {
+      "width": 500,
+      "height": 320
+    }
+  },
+  "export": {
+    "default_format": "excel",
+    "export_dir": "exports"
+  }
+}

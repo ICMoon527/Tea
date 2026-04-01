@@ -30,6 +30,7 @@ class ConfigManager:
             "window_height": 800,
             "show_status_bar": True
         },
+        "window_sizes": {},
         "export": {
             "default_format": "excel",
             "export_dir": "exports"
@@ -247,3 +248,60 @@ class ConfigManager:
             'default_format': self.get('export.default_format', 'excel'),
             'export_dir': self.get('export.export_dir', 'exports')
         }
+    
+    def save_window_size(self, window_id: str, width: int, height: int) -> bool:
+        """保存窗口大小
+        
+        Args:
+            window_id: 窗口唯一标识符
+            width: 窗口宽度
+            height: 窗口高度
+            
+        Returns:
+            是否保存成功
+        """
+        try:
+            if 'window_sizes' not in self.config:
+                self.config['window_sizes'] = {}
+            self.config['window_sizes'][window_id] = {
+                'width': width,
+                'height': height
+            }
+            return self._save_config()
+        except Exception as e:
+            print(f"保存窗口大小失败: {e}")
+            return False
+    
+    def load_window_size(self, window_id: str, default_width: int, default_height: int) -> tuple:
+        """加载窗口大小
+        
+        Args:
+            window_id: 窗口唯一标识符
+            default_width: 默认宽度
+            default_height: 默认高度
+            
+        Returns:
+            (width, height) 元组
+        """
+        try:
+            window_sizes = self.get('window_sizes', {})
+            if window_id in window_sizes:
+                size = window_sizes[window_id]
+                return (size.get('width', default_width), size.get('height', default_height))
+        except Exception as e:
+            print(f"加载窗口大小失败: {e}")
+        
+        return (default_width, default_height)
+    
+    def reset_window_sizes(self) -> bool:
+        """重置所有窗口大小为默认值
+        
+        Returns:
+            是否重置成功
+        """
+        try:
+            self.config['window_sizes'] = {}
+            return self._save_config()
+        except Exception as e:
+            print(f"重置窗口大小失败: {e}")
+            return False

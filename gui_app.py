@@ -5,6 +5,7 @@ from tea_inventory_system import TeaInventorySystem
 from backup_manager import BackupManager
 from operation_logger import OperationLogger
 from cloud_sync import CloudSyncManager
+from config_manager import ConfigManager
 import pandas as pd
 from prettytable import PrettyTable
 from datetime import datetime
@@ -68,7 +69,7 @@ class Styles:
     BUTTON_HEIGHT = 2
     ENTRY_WIDTH = 32
     WINDOW_WIDTH = 1280
-    WINDOW_HEIGHT = 850
+    WINDOW_HEIGHT = 700
     DIALOG_WIDTH = 680
     DIALOG_HEIGHT = 480
     
@@ -84,8 +85,22 @@ class TeaInventoryGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("茶叶进销存管理系统——狗拿耗子")
-        self.root.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
+        
+        # 初始化配置管理器
+        self.config_manager = ConfigManager()
+        
+        # 加载主窗口保存的大小
+        win_width, win_height = self.config_manager.load_window_size(
+            "main_window", 
+            Styles.WINDOW_WIDTH, 
+            Styles.WINDOW_HEIGHT
+        )
+        self.root.geometry(f"{win_width}x{win_height}")
         self.root.configure(bg=Styles.BACKGROUND_COLOR)
+        
+        # 绑定主窗口关闭事件，保存窗口大小
+        self.root.protocol("WM_DELETE_WINDOW", self._on_main_window_close)
+        
         self.system = TeaInventorySystem()
         
         # 初始化备份管理器、日志记录器和云同步管理器
@@ -98,6 +113,50 @@ class TeaInventoryGUI:
         self._configure_styles()
 
         self.create_main_menu()
+    
+    def _on_main_window_close(self):
+        """主窗口关闭时保存窗口大小"""
+        try:
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+            self.config_manager.save_window_size("main_window", width, height)
+        except Exception as e:
+            print(f"保存主窗口大小失败: {e}")
+        self.root.destroy()
+    
+    def _create_toplevel_with_size(self, window_id: str, default_width: int, default_height: int, parent=None) -> tk.Toplevel:
+        """创建带大小记忆功能的Toplevel窗口
+        
+        Args:
+            window_id: 窗口唯一标识符
+            default_width: 默认宽度
+            default_height: 默认高度
+            parent: 父窗口（默认为self.root）
+            
+        Returns:
+            Toplevel窗口对象
+        """
+        if parent is None:
+            parent = self.root
+        top = tk.Toplevel(parent)
+        
+        # 加载保存的窗口大小
+        width, height = self.config_manager.load_window_size(window_id, default_width, default_height)
+        top.geometry(f"{width}x{height}")
+        
+        # 绑定窗口关闭事件，保存大小
+        def on_close():
+            try:
+                w = top.winfo_width()
+                h = top.winfo_height()
+                self.config_manager.save_window_size(window_id, w, h)
+            except Exception as e:
+                print(f"保存窗口大小失败 ({window_id}): {e}")
+            top.destroy()
+        
+        top.protocol("WM_DELETE_WINDOW", on_close)
+        
+        return top
 
     def _configure_styles(self):
         """配置ttk控件样式 - 生产级现代化设计"""
@@ -228,17 +287,17 @@ class TeaInventoryGUI:
 
         # 主容器
         main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL, pady=Styles.SPACING_XL)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_LG, pady=Styles.SPACING_LG)
 
         # 顶部标题区域
         header_frame = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
-        header_frame.pack(fill=tk.X, pady=(0, Styles.SPACING_XL))
+        header_frame.pack(fill=tk.X, pady=(0, Styles.SPACING_LG))
 
         # 主标题
         title_label = tk.Label(
             header_frame,
             text="茶叶进销存管理系统",
-            font=Styles.HEADER_FONT,
+            font=("微软雅黑", 22, "bold"),
             bg=Styles.BACKGROUND_COLOR,
             fg=Styles.TEXT_PRIMARY
         )
@@ -278,7 +337,7 @@ class TeaInventoryGUI:
 
         # 底部版权信息
         footer_frame = tk.Frame(main_container, bg=Styles.BACKGROUND_COLOR)
-        footer_frame.pack(fill=tk.X, pady=(Styles.SPACING_XL, 0))
+        footer_frame.pack(fill=tk.X, pady=(Styles.SPACING_MD, 0))
         
         footer_label = tk.Label(
             footer_frame,
@@ -297,7 +356,7 @@ class TeaInventoryGUI:
             highlightbackground=Styles.BORDER_COLOR,
             highlightthickness=1
         )
-        card.grid(row=row, column=col, padx=Styles.SPACING_MD, pady=Styles.SPACING_MD, sticky="nsew")
+        card.grid(row=row, column=col, padx=Styles.SPACING_SM, pady=Styles.SPACING_SM, sticky="nsew")
         
         # 使卡片可伸缩
         parent.grid_columnconfigure(col, weight=1)
@@ -305,13 +364,13 @@ class TeaInventoryGUI:
         
         # 卡片内容
         content = tk.Frame(card, bg=Styles.SURFACE_COLOR)
-        content.pack(expand=True, padx=Styles.SPACING_XL, pady=Styles.SPACING_XL)
+        content.pack(expand=True, padx=Styles.SPACING_LG, pady=Styles.SPACING_LG)
         
         # 图标
         icon_label = tk.Label(
             content,
             text=icon,
-            font=("微软雅黑", 32),
+            font=("微软雅黑", 24),
             bg=Styles.SURFACE_COLOR,
             fg=Styles.PRIMARY_COLOR
         )
@@ -321,11 +380,11 @@ class TeaInventoryGUI:
         text_label = tk.Label(
             content,
             text=text,
-            font=Styles.TITLE_FONT,
+            font=("微软雅黑", 14),
             bg=Styles.SURFACE_COLOR,
             fg=Styles.TEXT_PRIMARY
         )
-        text_label.pack(pady=(Styles.SPACING_SM, 0))
+        text_label.pack(pady=(Styles.SPACING_XS, 0))
         
         # 悬停效果
         def on_enter(e):
@@ -359,7 +418,7 @@ class TeaInventoryGUI:
     def _create_page_header(self, parent, title, subtitle=None):
         """创建统一的页面标题区域"""
         header_frame = tk.Frame(parent, bg=Styles.BACKGROUND_COLOR)
-        header_frame.pack(fill=tk.X, pady=(Styles.SPACING_LG, Styles.SPACING_MD))
+        header_frame.pack(fill=tk.X, pady=(10, 5))
         
         # 标题
         title_label = tk.Label(
@@ -380,14 +439,14 @@ class TeaInventoryGUI:
                 bg=Styles.BACKGROUND_COLOR,
                 fg=Styles.TEXT_SECONDARY
             )
-            subtitle_label.pack(anchor=tk.W, pady=(Styles.SPACING_XS, 0))
+            subtitle_label.pack(anchor=tk.W, pady=(2, 0))
         
         return header_frame
 
     def _create_back_button(self, parent, command):
         """创建返回按钮"""
         btn_frame = tk.Frame(parent, bg=Styles.BACKGROUND_COLOR)
-        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(Styles.SPACING_MD, Styles.SPACING_LG))
+        btn_frame.pack(fill=tk.X, side=tk.BOTTOM, pady=(5, 10))
         
         btn = ttk.Button(
             btn_frame,
@@ -395,7 +454,7 @@ class TeaInventoryGUI:
             command=command,
             style="Secondary.TButton"
         )
-        btn.pack(anchor=tk.W, padx=Styles.SPACING_XL)
+        btn.pack(anchor=tk.W, padx=0)
         return btn
 
     def _create_button_grid(self, parent, buttons, columns=None):
@@ -407,7 +466,7 @@ class TeaInventoryGUI:
             columns: 列数（自动判断如果为None）
         """
         button_grid = tk.Frame(parent, bg=Styles.BACKGROUND_COLOR)
-        button_grid.pack(pady=Styles.SPACING_LG, fill=tk.BOTH, expand=True)
+        button_grid.pack(pady=10, fill=tk.BOTH, expand=True)
         
         # 智能判断列数 - 更合理的分布
         num_buttons = len(buttons)
@@ -449,7 +508,7 @@ class TeaInventoryGUI:
                 highlightbackground=Styles.BORDER_COLOR,
                 highlightthickness=1
             )
-            card.grid(row=row, column=col, padx=Styles.SPACING_LG, pady=Styles.SPACING_LG, sticky="nsew")
+            card.grid(row=row, column=col, padx=15, pady=15, sticky="nsew")
             
             # 卡片内容容器
             content_frame = tk.Frame(card, bg=Styles.SURFACE_COLOR)
@@ -457,31 +516,38 @@ class TeaInventoryGUI:
             
             # 卡片内容 - 使用grid居中
             content = tk.Frame(content_frame, bg=Styles.SURFACE_COLOR)
-            content.grid(row=0, column=0, sticky="nsew", padx=Styles.SPACING_2XL, pady=Styles.SPACING_2XL)
+            content.grid(row=0, column=0, sticky="nsew", padx=20, pady=20)
             content_frame.grid_rowconfigure(0, weight=1)
             content_frame.grid_columnconfigure(0, weight=1)
             
-            # 图标 - 更大更醒目
+            # 配置 content 的行和列权重
+            content.grid_rowconfigure(0, weight=3)
+            content.grid_rowconfigure(1, weight=2)
+            content.grid_columnconfigure(0, weight=1)
+            
+            # 图标 - 更小更紧凑
             icon_label = tk.Label(
                 content,
                 text=icon,
-                font=("微软雅黑", 48),
+                font=("微软雅黑", 36),
                 bg=Styles.SURFACE_COLOR,
-                fg=Styles.PRIMARY_COLOR
+                fg=Styles.PRIMARY_COLOR,
+                anchor=tk.CENTER,
+                justify=tk.CENTER
             )
-            icon_label.pack()
+            icon_label.grid(row=0, column=0, sticky="nsew", pady=(5, 0))
             
-            # 文本 - 更好的换行和间距
+            # 文本 - 更紧凑
             text_label = tk.Label(
                 content,
                 text=text,
-                font=Styles.TITLE_FONT,
+                font=Styles.LABEL_FONT,
                 bg=Styles.SURFACE_COLOR,
                 fg=Styles.TEXT_PRIMARY,
-                wraplength=180,
+                wraplength=160,
                 justify=tk.CENTER
             )
-            text_label.pack(pady=(Styles.SPACING_LG, 0))
+            text_label.grid(row=1, column=0, sticky="n", pady=(5, 5))
             
             # 使用默认参数绑定当前值
             def make_on_enter(c=card, ct=content, il=icon_label, tl=text_label, cf=content_frame):
@@ -538,7 +604,7 @@ class TeaInventoryGUI:
         
         # 主容器
         main_container = tk.Frame(self.root, bg=Styles.BACKGROUND_COLOR)
-        main_container.pack(fill=tk.BOTH, expand=True, padx=Styles.SPACING_XL)
+        main_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
         
         # 页面标题
         self._create_page_header(main_container, "商品管理", "管理您的茶叶商品库存")
@@ -568,14 +634,14 @@ class TeaInventoryGUI:
 
     def add_product_gui(self):
         """添加商品GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("add_product", 760, 600)
         top.title("添加商品")
-        top.geometry("800x900")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        title_frame.pack(pady=(15, 10))
         
         tk.Label(
             title_frame, 
@@ -585,89 +651,91 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        # 创建表单
-        form_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        form_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM)
+        # 创建表单容器 - 使用Canvas和滚动条
+        form_container = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        form_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
 
-        # 商品编号
-        tk.Label(form_frame, text="商品编号 (留空自动生成)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=5)
-        com_id_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=com_id_var, width=30, font=Styles.TEXT_FONT).grid(row=0, column=1, pady=5)
+        # 创建Canvas用于滚动
+        canvas = tk.Canvas(form_container, bg=Styles.BACKGROUND_COLOR, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(form_container, orient="vertical", command=canvas.yview)
+        form_scroll_frame = tk.Frame(canvas, bg=Styles.BACKGROUND_COLOR)
 
-        # 茶类
-        tk.Label(form_frame, text="茶类 *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=1, column=0, sticky='w', pady=5)
-        tea_category_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=tea_category_var, width=30, font=Styles.TEXT_FONT).grid(row=1, column=1, pady=5)
+        form_scroll_frame.bind(
+            "<Configure>",
+            lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+        )
 
-        # 品种
-        tk.Label(form_frame, text="品种 *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=2, column=0, sticky='w', pady=5)
-        variety_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=variety_var, width=30, font=Styles.TEXT_FONT).grid(row=2, column=1, pady=5)
+        canvas.create_window((0, 0), window=form_scroll_frame, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
 
-        # 公司/品牌
-        tk.Label(form_frame, text="公司/品牌", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=3, column=0, sticky='w', pady=5)
-        company_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=company_var, width=30, font=Styles.TEXT_FONT).grid(row=3, column=1, pady=5)
+        canvas.pack(side="left", fill="both", expand=True)
+        scrollbar.pack(side="right", fill="y")
 
-        # 产区
-        tk.Label(form_frame, text="产区", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=4, column=0, sticky='w', pady=5)
-        origin_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=origin_var, width=30, font=Styles.TEXT_FONT).grid(row=4, column=1, pady=5)
+        # 创建两列表单
+        left_col = tk.Frame(form_scroll_frame, bg=Styles.BACKGROUND_COLOR)
+        right_col = tk.Frame(form_scroll_frame, bg=Styles.BACKGROUND_COLOR)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
-        # 商品名称
-        tk.Label(form_frame, text="商品名称 *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=5, column=0, sticky='w', pady=5)
-        name_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=name_var, width=30, font=Styles.TEXT_FONT).grid(row=5, column=1, pady=5)
+        # 左列字段
+        fields_left = [
+            ("商品编号 (留空自动生成)", "com_id", ""),
+            ("茶类 *", "tea_category", ""),
+            ("品种 *", "variety", ""),
+            ("公司/品牌", "company", ""),
+            ("产区", "origin", ""),
+            ("商品名称 *", "name", ""),
+            ("规格 *", "specification", ""),
+            ("成本价(每斤) *", "cost_price", ""),
+        ]
 
-        # 规格
-        tk.Label(form_frame, text="规格 *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=6, column=0, sticky='w', pady=5)
-        specification_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=specification_var, width=30, font=Styles.TEXT_FONT).grid(row=6, column=1, pady=5)
+        vars_left = {}
+        for i, (label_text, key, default) in enumerate(fields_left):
+            frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+            frame.pack(fill=tk.X, pady=3)
+            tk.Label(frame, text=label_text, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+            var = tk.StringVar(value=default)
+            vars_left[key] = var
+            tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
-        # 成本价
-        tk.Label(form_frame, text="成本价(每斤) *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=7, column=0, sticky='w', pady=5)
-        cost_price_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=cost_price_var, width=30, font=Styles.TEXT_FONT).grid(row=7, column=1, pady=5)
+        com_id_var = vars_left["com_id"]
+        tea_category_var = vars_left["tea_category"]
+        variety_var = vars_left["variety"]
+        company_var = vars_left["company"]
+        origin_var = vars_left["origin"]
+        name_var = vars_left["name"]
+        specification_var = vars_left["specification"]
+        cost_price_var = vars_left["cost_price"]
 
-        # 零售价
-        tk.Label(form_frame, text="零售价(每斤) *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=8, column=0, sticky='w', pady=5)
-        retail_price_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=retail_price_var, width=30, font=Styles.TEXT_FONT).grid(row=8, column=1, pady=5)
+        # 右列字段
+        fields_right = [
+            ("零售价(每斤) *", "retail_price", ""),
+            ("初始库存(斤) *", "current_stock", ""),
+            ("生产日期(YYYY-MM-DD)", "production_date", ""),
+            ("保质期(月) *", "shelf_life", ""),
+            ("品质特征", "quality_features", ""),
+            ("年份", "year", ""),
+            ("等级", "grade", ""),
+            ("计量单位(斤/克)", "unit", "斤"),
+        ]
 
-        # 初始库存
-        tk.Label(form_frame, text="初始库存(斤) *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=9, column=0, sticky='w', pady=5)
-        current_stock_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=current_stock_var, width=30, font=Styles.TEXT_FONT).grid(row=9, column=1, pady=5)
+        vars_right = {}
+        for i, (label_text, key, default) in enumerate(fields_right):
+            frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+            frame.pack(fill=tk.X, pady=3)
+            tk.Label(frame, text=label_text, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+            var = tk.StringVar(value=default)
+            vars_right[key] = var
+            tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
-        # 生产日期
-        tk.Label(form_frame, text="生产日期(YYYY-MM-DD)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=10, column=0, sticky='w', pady=5)
-        production_date_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=production_date_var, width=30, font=Styles.TEXT_FONT).grid(row=10, column=1, pady=5)
-
-        # 保质期
-        tk.Label(form_frame, text="保质期(月) *", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=11, column=0, sticky='w', pady=5)
-        shelf_life_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=shelf_life_var, width=30, font=Styles.TEXT_FONT).grid(row=11, column=1, pady=5)
-
-        # 品质特征
-        tk.Label(form_frame, text="品质特征", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=12, column=0, sticky='w', pady=5)
-        quality_features_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=quality_features_var, width=30, font=Styles.TEXT_FONT).grid(row=12, column=1, pady=5)
-
-        # 年份
-        tk.Label(form_frame, text="年份", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=13, column=0, sticky='w', pady=5)
-        year_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=year_var, width=30, font=Styles.TEXT_FONT).grid(row=13, column=1, pady=5)
-
-        # 等级
-        tk.Label(form_frame, text="等级", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=14, column=0, sticky='w', pady=5)
-        grade_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=grade_var, width=30, font=Styles.TEXT_FONT).grid(row=14, column=1, pady=5)
-
-        # 计量单位
-        tk.Label(form_frame, text="计量单位(斤/克) (默认: 斤)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=15, column=0, sticky='w', pady=5)
-        unit_var = tk.StringVar(value="斤")
-        tk.Entry(form_frame, textvariable=unit_var, width=30, font=Styles.TEXT_FONT).grid(row=15, column=1, pady=5)
+        retail_price_var = vars_right["retail_price"]
+        current_stock_var = vars_right["current_stock"]
+        production_date_var = vars_right["production_date"]
+        shelf_life_var = vars_right["shelf_life"]
+        quality_features_var = vars_right["quality_features"]
+        year_var = vars_right["year"]
+        grade_var = vars_right["grade"]
+        unit_var = vars_right["unit"]
 
         # 按钮
         btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -761,15 +829,15 @@ class TeaInventoryGUI:
 
     def update_product_gui(self):
         """修改商品GUI - 从列表选择"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("update_product", 760, 550)
         top.title("修改商品")
-        top.geometry("1000x700")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         tk.Label(top, text="请选择要修改的商品", 
                  font=Styles.SUB_HEADER_FONT,
                  bg=Styles.BACKGROUND_COLOR,
-                 fg=Styles.HEADER_COLOR).pack(pady=Styles.PADY_MEDIUM)
+                 fg=Styles.HEADER_COLOR).pack(pady=(15, 10))
 
         # 获取所有商品
         df = self.system.excel_manager.get_all_commodities()
@@ -780,14 +848,14 @@ class TeaInventoryGUI:
 
         # 创建商品列表
         list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        list_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM, fill=tk.BOTH, expand=True)
+        list_frame.pack(pady=(0, 10), padx=20, fill=tk.BOTH, expand=True)
 
         tree = ttk.Treeview(list_frame, style="Treeview", show="headings")
         tree["columns"] = ("商品编号", "商品名称", "茶类", "品种", "当前库存", "零售价")
 
         for col in tree["columns"]:
             tree.heading(col, text=col)
-            tree.column(col, width=150, anchor=tk.CENTER)
+            tree.column(col, width=110, anchor=tk.CENTER)
 
         scrollbar_y = ttk.Scrollbar(list_frame, orient=tk.VERTICAL, command=tree.yview)
         tree.configure(yscrollcommand=scrollbar_y.set)
@@ -822,14 +890,14 @@ class TeaInventoryGUI:
                 return
 
             # 创建修改窗口
-            edit_top = tk.Toplevel(top)
+            edit_top = self._create_toplevel_with_size("edit_product", 760, 550)
             edit_top.title("修改商品信息")
-            edit_top.geometry("900x800")
             edit_top.configure(bg=Styles.BACKGROUND_COLOR)
+            edit_top.resizable(True, True)
 
             # 创建标题区域
             title_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
-            title_frame.pack(pady=Styles.PADY_MEDIUM)
+            title_frame.pack(pady=(15, 10))
             
             tk.Label(
                 title_frame, 
@@ -839,12 +907,36 @@ class TeaInventoryGUI:
                 fg=Styles.HEADER_COLOR
             ).pack()
 
-            form_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
-            form_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM)
+            # 创建表单容器 - 使用Canvas和滚动条
+            form_container = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
+            form_container.pack(fill=tk.BOTH, expand=True, padx=20, pady=10)
+
+            # 创建Canvas用于滚动
+            canvas = tk.Canvas(form_container, bg=Styles.BACKGROUND_COLOR, highlightthickness=0)
+            scrollbar = ttk.Scrollbar(form_container, orient="vertical", command=canvas.yview)
+            form_scroll_frame = tk.Frame(canvas, bg=Styles.BACKGROUND_COLOR)
+
+            form_scroll_frame.bind(
+                "<Configure>",
+                lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+            )
+
+            canvas.create_window((0, 0), window=form_scroll_frame, anchor="nw")
+            canvas.configure(yscrollcommand=scrollbar.set)
+
+            canvas.pack(side="left", fill="both", expand=True)
+            scrollbar.pack(side="right", fill="y")
+
+            # 创建两列表单
+            left_col = tk.Frame(form_scroll_frame, bg=Styles.BACKGROUND_COLOR)
+            right_col = tk.Frame(form_scroll_frame, bg=Styles.BACKGROUND_COLOR)
+            left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+            right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
             # 创建变量
             vars = {}
-            fields = [
+            fields_left = [
+                ("商品编号", "商品编号", commodity['商品编号']),
                 ("茶类", "茶类", commodity['茶类']),
                 ("品种", "品种", commodity['品种']),
                 ("公司", "公司", commodity['公司']),
@@ -852,6 +944,17 @@ class TeaInventoryGUI:
                 ("商品名称", "商品名称", commodity['商品名称']),
                 ("规格", "规格", commodity['规格']),
                 ("成本价", "成本价", commodity['成本价']),
+            ]
+
+            for label, key, value in fields_left:
+                frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+                frame.pack(fill=tk.X, pady=3)
+                tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+                var = tk.StringVar(value=str(value) if pd.notna(value) else "")
+                vars[key] = var
+                tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+
+            fields_right = [
                 ("零售价", "零售价", commodity['零售价']),
                 ("当前库存", "当前库存", commodity['当前库存']),
                 ("生产日期", "生产日期", commodity['生产日期']),
@@ -859,14 +962,16 @@ class TeaInventoryGUI:
                 ("品质特征", "品质特征", commodity['品质特征']),
                 ("年份", "年份", commodity['年份']),
                 ("等级", "等级", commodity['等级']),
-                ("单位", "单位", commodity['单位'])
+                ("单位", "单位", commodity['单位']),
             ]
 
-            for i, (label, key, value) in enumerate(fields):
-                tk.Label(form_frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=i, column=0, sticky='w', pady=5)
+            for label, key, value in fields_right:
+                frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+                frame.pack(fill=tk.X, pady=3)
+                tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
                 var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(form_frame, textvariable=var, width=30, font=Styles.TEXT_FONT).grid(row=i, column=1, pady=5)
+                tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
             def save():
                 updates = {}
@@ -892,7 +997,7 @@ class TeaInventoryGUI:
                     messagebox.showinfo("提示", "未做任何修改。")
 
             btn_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
-            btn_frame.pack(pady=Styles.PADY_MEDIUM)
+            btn_frame.pack(pady=10)
             btn_save = tk.Button(btn_frame, text="保存修改", font=Styles.BUTTON_FONT,
                       width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=save,
                       bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
@@ -906,7 +1011,7 @@ class TeaInventoryGUI:
             btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
 
         btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        btn_frame.pack(pady=Styles.PADY_MEDIUM)
+        btn_frame.pack(pady=10)
 
         tk.Button(btn_frame, text="修改选中商品", 
                  font=Styles.BUTTON_FONT,
@@ -933,9 +1038,8 @@ class TeaInventoryGUI:
 
     def delete_product_gui(self):
         """删除商品GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("delete_product", 400, 350)
         top.title("删除商品")
-        top.geometry("400x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -989,9 +1093,8 @@ class TeaInventoryGUI:
 
     def query_product_by_id_gui(self):
         """按编号查询商品GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("query_product_by_id", 400, 350)
         top.title("按编号查询商品")
-        top.geometry("400x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         # 创建标题区域
@@ -1021,9 +1124,8 @@ class TeaInventoryGUI:
                 return
 
             # 显示商品信息
-            info_top = tk.Toplevel(top)
+            info_top = self._create_toplevel_with_size("product_info", 700, 500)
             info_top.title("商品信息")
-            info_top.geometry("700x500")
             info_top.configure(bg=Styles.BACKGROUND_COLOR)
 
             # 创建标题区域
@@ -1079,9 +1181,8 @@ class TeaInventoryGUI:
 
     def query_product_by_name_gui(self):
         """按商品名模糊查询商品GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("query_product_by_name", 900, 700)
         top.title("按商品名查询")
-        top.geometry("900x700")
         top.configure(bg=Styles.BACKGROUND_COLOR)
 
         tk.Label(top, text="请输入商品名称（支持模糊搜索）", 
@@ -1166,10 +1267,10 @@ class TeaInventoryGUI:
                 messagebox.showerror("错误", "未找到该商品")
                 return
             
-            info_top = tk.Toplevel(top)
+            info_top = self._create_toplevel_with_size("product_detail", 700, 500)
             info_top.title("商品详情")
-            info_top.geometry("700x500")
             info_top.configure(bg=Styles.BACKGROUND_COLOR)
+            info_top.resizable(True, True)
             
             frame = tk.Frame(info_top, bg=Styles.BACKGROUND_COLOR)
             frame.pack(pady=Styles.PADY_LARGE, padx=Styles.PADX_LARGE)
@@ -1268,14 +1369,14 @@ class TeaInventoryGUI:
 
     def add_to_cart_gui(self):
         """添加商品到购物车GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("add_to_cart", 1000, 680)
         top.title("添加商品到购物车")
-        top.geometry("800x650")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        title_frame.pack(pady=(Styles.SPACING_MD, Styles.SPACING_SM))
         
         tk.Label(
             title_frame, 
@@ -1291,13 +1392,11 @@ class TeaInventoryGUI:
             # 筛选有库存的商品
             available_commodities = all_commodities[all_commodities['当前库存'].astype(float) > 0]
             if not available_commodities.empty:
-                # tk.Label(top, text="可销售的商品列表", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
-                
                 # 创建商品列表框
                 list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-                list_frame.pack(pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
+                list_frame.pack(pady=(Styles.SPACING_XS, Styles.SPACING_XS), fill=tk.BOTH, expand=True, padx=Styles.SPACING_LG)
                 
-                listbox = tk.Listbox(list_frame, width=80, height=15, font=Styles.TEXT_FONT)
+                listbox = tk.Listbox(list_frame, width=100, height=18, font=Styles.TEXT_FONT)
                 listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
                 
                 scrollbar = tk.Scrollbar(list_frame, orient=tk.VERTICAL, command=listbox.yview)
@@ -1331,22 +1430,22 @@ class TeaInventoryGUI:
                 
                 # 选择商品
                 input_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-                input_frame.pack(pady=Styles.PADY_MEDIUM)
+                input_frame.pack(pady=Styles.SPACING_SM)
                 
                 # 水平排列输入框
                 input_row_frame = tk.Frame(input_frame, bg=Styles.BACKGROUND_COLOR)
-                input_row_frame.pack(pady=Styles.PADY_SMALL, fill=tk.X)
+                input_row_frame.pack(pady=Styles.SPACING_XS, fill=tk.X)
                 
                 # 商品序号
                 serial_frame = tk.Frame(input_row_frame, bg=Styles.BACKGROUND_COLOR)
-                serial_frame.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                serial_frame.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
                 tk.Label(serial_frame, text="商品序号: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack()
                 choice_var = tk.StringVar()
                 tk.Entry(serial_frame, textvariable=choice_var, width=10, font=Styles.TEXT_FONT).pack()
                 
                 # 购买数量
                 quantity_frame = tk.Frame(input_row_frame, bg=Styles.BACKGROUND_COLOR)
-                quantity_frame.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                quantity_frame.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
                 tk.Label(quantity_frame, text="购买数量: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack()
                 quantity_var = tk.StringVar()
                 quantity_entry = tk.Entry(quantity_frame, textvariable=quantity_var, width=20, font=Styles.TEXT_FONT)
@@ -1354,7 +1453,7 @@ class TeaInventoryGUI:
                 
                 # 购买单位
                 unit_frame = tk.Frame(input_row_frame, bg=Styles.BACKGROUND_COLOR)
-                unit_frame.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                unit_frame.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
                 tk.Label(unit_frame, text="单位 (1-斤, 2-克): ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack()
                 unit_var = tk.StringVar(value="2")
                 tk.Entry(unit_frame, textvariable=unit_var, width=10, font=Styles.TEXT_FONT).pack()
@@ -1417,12 +1516,12 @@ class TeaInventoryGUI:
                         messagebox.showerror("错误", "请输入有效的数字")
                 
                 btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-                btn_frame.pack(pady=Styles.PADY_MEDIUM)
+                btn_frame.pack(pady=Styles.SPACING_MD)
                 
                 btn_add = tk.Button(btn_frame, text="添加到购物车", font=Styles.BUTTON_FONT,
                           width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=add_to_cart,
                           bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-                btn_add.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                btn_add.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
                 btn_add.bind("<Enter>", lambda e, b=btn_add: b.config(bg=Styles.BUTTON_HOVER_COLOR))
                 btn_add.bind("<Leave>", lambda e, b=btn_add: b.config(bg=Styles.PRIMARY_COLOR))
                 
@@ -1430,7 +1529,7 @@ class TeaInventoryGUI:
                 btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
                           width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
                           bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-                btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+                btn_cancel.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
                 btn_cancel.bind("<Enter>", lambda e, b=btn_cancel: b.config(bg="#C0392B"))
                 btn_cancel.bind("<Leave>", lambda e, b=btn_cancel: b.config(bg=Styles.ERROR_COLOR))
             else:
@@ -1460,14 +1559,14 @@ class TeaInventoryGUI:
 
     def view_cart_gui(self):
         """查看购物车GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("view_cart", 900, 650)
         top.title("购物车")
-        top.geometry("800x600")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        title_frame.pack(pady=(Styles.SPACING_MD, Styles.SPACING_XS))
         
         tk.Label(
             title_frame, 
@@ -1478,12 +1577,19 @@ class TeaInventoryGUI:
         ).pack()
 
         if not self.system.shopping_cart:
-            tk.Label(top, text="购物车为空", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
+            tk.Label(top, text="购物车为空", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XL)
+            # 购物车为空时的关闭按钮
+            btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            btn_frame.pack(pady=Styles.SPACING_MD)
+            btn_close = tk.Button(btn_frame, text="关闭", font=Styles.BUTTON_FONT,
+                      width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
+                      bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
+            btn_close.pack()
         else:
-            tk.Label(top, text="购物车商品", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+            tk.Label(top, text="购物车商品", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
             
             frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-            frame.pack(pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
+            frame.pack(pady=Styles.SPACING_XS, fill=tk.BOTH, expand=True, padx=Styles.SPACING_LG)
             
             tree = ttk.Treeview(frame, style="Treeview")
             tree["columns"] = ["商品编号", "商品名称", "单价(每斤)", "数量", "单位", "小计"]
@@ -1491,7 +1597,7 @@ class TeaInventoryGUI:
             
             for col in tree["columns"]:
                 tree.heading(col, text=col)
-                tree.column(col, width=100, anchor=tk.CENTER)
+                tree.column(col, width=130, anchor=tk.CENTER)
             
             total = 0
             for item in self.system.shopping_cart:
@@ -1511,7 +1617,7 @@ class TeaInventoryGUI:
             tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             
-            tk.Label(top, text=f"总计: {total:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.PADY_MEDIUM)
+            tk.Label(top, text=f"总计: {total:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.SPACING_SM)
             
             # 双击修改商品数量
             def double_click_modify(event):
@@ -1576,26 +1682,18 @@ class TeaInventoryGUI:
             
             # 添加按钮
             btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-            btn_frame.pack(pady=Styles.PADY_MEDIUM)
+            btn_frame.pack(pady=Styles.SPACING_MD)
             
             btn_delete = tk.Button(btn_frame, text="删除选中商品", font=Styles.BUTTON_FONT,
                       width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=delete_selected,
                       bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-            btn_delete.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+            btn_delete.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
             
             # 添加关闭按钮到同一框架
             btn_close = tk.Button(btn_frame, text="关闭", font=Styles.BUTTON_FONT,
                       width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
                       bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-            btn_close.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
-            tk.Label(top, text="购物车为空", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_LARGE)
-            # 购物车为空时的关闭按钮
-            btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-            btn_frame.pack(pady=Styles.PADY_MEDIUM)
-            btn_close = tk.Button(btn_frame, text="关闭", font=Styles.BUTTON_FONT,
-                      width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
-                      bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-            btn_close.pack()
+            btn_close.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
 
     def clear_cart_gui(self):
         """清空购物车GUI"""
@@ -1613,14 +1711,14 @@ class TeaInventoryGUI:
             messagebox.showerror("错误", "购物车为空，无法结账")
             return
         
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("checkout", 800, 700)
         top.title("结账")
-        top.geometry("600x750")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        title_frame.pack(pady=Styles.PADY_MEDIUM)
+        title_frame.pack(pady=(Styles.SPACING_MD, Styles.SPACING_XS))
         
         tk.Label(
             title_frame, 
@@ -1632,10 +1730,9 @@ class TeaInventoryGUI:
 
         # 显示购物车内容
         total_amount = sum(item['小计'] for item in self.system.shopping_cart)
-        # tk.Label(top, text="购物车商品", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
         
         frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        frame.pack(pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
+        frame.pack(pady=Styles.SPACING_XS, fill=tk.BOTH, expand=True, padx=Styles.SPACING_LG)
         
         tree = ttk.Treeview(frame, style="Treeview")
         tree["columns"] = ["商品名称", "数量", "单位", "小计"]
@@ -1643,7 +1740,7 @@ class TeaInventoryGUI:
         
         for col in tree["columns"]:
             tree.heading(col, text=col)
-            tree.column(col, width=100, anchor=tk.CENTER)
+            tree.column(col, width=140, anchor=tk.CENTER)
         
         for item in self.system.shopping_cart:
             tree.insert("", tk.END, values=[
@@ -1659,20 +1756,20 @@ class TeaInventoryGUI:
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        tk.Label(top, text=f"应付总额: {total_amount:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.PADY_MEDIUM)
+        tk.Label(top, text=f"应付总额: {total_amount:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.SPACING_SM)
         
         input_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        input_frame.pack(pady=Styles.PADY_MEDIUM)
+        input_frame.pack(pady=Styles.SPACING_SM)
         
         # 客户名称
-        tk.Label(input_frame, text="客户名称: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+        tk.Label(input_frame, text="客户名称: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
         customer_var = tk.StringVar()
-        tk.Entry(input_frame, textvariable=customer_var, width=30, font=Styles.TEXT_FONT).pack(pady=Styles.PADY_SMALL)
+        tk.Entry(input_frame, textvariable=customer_var, width=30, font=Styles.TEXT_FONT).pack(pady=Styles.SPACING_XS)
         
         # 实收金额
-        tk.Label(input_frame, text="实收金额: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.PADY_SMALL)
+        tk.Label(input_frame, text="实收金额: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
         received_var = tk.StringVar(value=str(total_amount))
-        tk.Entry(input_frame, textvariable=received_var, width=30, font=Styles.TEXT_FONT).pack(pady=Styles.PADY_SMALL)
+        tk.Entry(input_frame, textvariable=received_var, width=30, font=Styles.TEXT_FONT).pack(pady=Styles.SPACING_XS)
         
         def process_checkout():
             customer_name = customer_var.get().strip()
@@ -1689,9 +1786,9 @@ class TeaInventoryGUI:
                 if received_amount < total_amount:
                     if not messagebox.askyesno("确认", f"实收金额 {received_amount:.2f} 元低于应收金额 {total_amount:.2f} 元，是否继续？"):
                         return
-                    discount_ratio = received_amount / total_amount
-                else:
-                    discount_ratio = 1.0
+                
+                # 无论实收金额是高还是低，都按比例分配给每个商品
+                discount_ratio = received_amount / total_amount if total_amount > 0 else 1.0
                 
                 # 处理销售记录 - 统一以"斤"为单位
                 for item in self.system.shopping_cart:
@@ -1715,7 +1812,13 @@ class TeaInventoryGUI:
                     self.system.excel_manager.add_sale(sale_record.to_list())
                 
                 # 注意：add_sale方法中已经会自动更新客户信息，不需要重复调用
-                messagebox.showinfo("成功", f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元\n折扣: {discount_ratio:.2f}")
+                if received_amount < total_amount:
+                    message = f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元\n折扣: {total_amount - received_amount:.2f} 元"
+                elif received_amount > total_amount:
+                    message = f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元\n溢价: {received_amount - total_amount:.2f} 元"
+                else:
+                    message = f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元"
+                messagebox.showinfo("成功", message)
                 
                 # 清空购物车
                 self.system.shopping_cart.clear()
@@ -1724,19 +1827,19 @@ class TeaInventoryGUI:
                 messagebox.showerror("错误", "请输入有效的金额")
         
         btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        btn_frame.pack(pady=Styles.PADY_MEDIUM)
+        btn_frame.pack(pady=Styles.SPACING_MD)
         
         btn_confirm = tk.Button(btn_frame, text="确认结账", font=Styles.BUTTON_FONT,
                   width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=process_checkout,
                   bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-        btn_confirm.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+        btn_confirm.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
         btn_confirm.bind("<Enter>", lambda e, b=btn_confirm: b.config(bg=Styles.BUTTON_HOVER_COLOR))
         btn_confirm.bind("<Leave>", lambda e, b=btn_confirm: b.config(bg=Styles.PRIMARY_COLOR))
         
         btn_cancel = tk.Button(btn_frame, text="取消", font=Styles.BUTTON_FONT,
                   width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
                   bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
-        btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
+        btn_cancel.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
 
     def stock_management(self):
         """进货管理界面 - 现代化设计"""
@@ -1771,10 +1874,10 @@ class TeaInventoryGUI:
         """
         df = self.system.excel_manager.get_all_commodities()
         
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("select_product", 900, 600)
         top.title("选择商品")
-        top.geometry("900x600")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
         
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         title_frame.pack(pady=Styles.PADY_MEDIUM)
@@ -1867,10 +1970,10 @@ class TeaInventoryGUI:
         """
         df = self.system.excel_manager.get_all_suppliers()
         
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("select_supplier", 900, 600)
         top.title("选择供应商")
-        top.geometry("900x600")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
         
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         title_frame.pack(pady=Styles.PADY_MEDIUM)
@@ -1962,10 +2065,10 @@ class TeaInventoryGUI:
         """
         df = self.system.excel_manager.get_all_customers()
         
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("select_customer", 900, 600)
         top.title("选择客户")
-        top.geometry("900x600")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
         
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         title_frame.pack(pady=Styles.PADY_MEDIUM)
@@ -2051,10 +2154,10 @@ class TeaInventoryGUI:
     
     def stock_in_gui(self):
         """进货入库GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("stock_in", 800, 600)
         top.title("进货入库")
-        top.geometry("700x700")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2068,60 +2171,81 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        # 输入表单
-        form_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        form_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM)
-
-        # 商品编号
-        tk.Label(form_frame, text="商品编号", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=8)
-        com_id_var = tk.StringVar()
-        com_id_entry = tk.Entry(form_frame, textvariable=com_id_var, width=25, font=Styles.TEXT_FONT)
-        com_id_entry.grid(row=0, column=1, pady=8, padx=5)
+        # 输入表单 - 两列布局
+        form_container = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        form_container.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM)
         
-        btn_select_product = tk.Button(form_frame, text="选择...", font=Styles.BUTTON_FONT,
-                                      width=10, command=lambda: self._select_product_dialog(com_id_var),
-                                      bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=3)
-        btn_select_product.grid(row=0, column=2, pady=8)
+        left_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+        right_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
+
+        # 左列字段
+        # 商品编号
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="商品编号", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+        com_id_var = tk.StringVar()
+        entry_frame = tk.Frame(frame, bg=Styles.BACKGROUND_COLOR)
+        entry_frame.pack(fill=tk.X)
+        tk.Entry(entry_frame, textvariable=com_id_var, font=Styles.TEXT_FONT).pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(2, 0))
+        btn_select_product = tk.Button(entry_frame, text="选择...", font=Styles.TEXT_FONT,
+                                      width=8, command=lambda: self._select_product_dialog(com_id_var),
+                                      bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=2)
+        btn_select_product.pack(side=tk.LEFT, padx=(5, 0))
         btn_select_product.bind("<Enter>", lambda e, b=btn_select_product: b.config(bg=Styles.BUTTON_HOVER_COLOR))
         btn_select_product.bind("<Leave>", lambda e, b=btn_select_product: b.config(bg=Styles.PRIMARY_COLOR))
 
         # 进货单价
-        tk.Label(form_frame, text="进货单价(每斤)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=1, column=0, sticky='w', pady=8)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="进货单价(每斤)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         unit_price_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=unit_price_var, width=25, font=Styles.TEXT_FONT).grid(row=1, column=1, pady=8, padx=5)
+        tk.Entry(frame, textvariable=unit_price_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 进货数量
-        tk.Label(form_frame, text="进货数量", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=2, column=0, sticky='w', pady=8)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="进货数量", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         quantity_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=quantity_var, width=25, font=Styles.TEXT_FONT).grid(row=2, column=1, pady=8, padx=5)
+        tk.Entry(frame, textvariable=quantity_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 进货单位
-        tk.Label(form_frame, text="进货单位 (斤/克)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=3, column=0, sticky='w', pady=8)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="进货单位 (斤/克)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         unit_var = tk.StringVar(value="斤")
-        tk.Entry(form_frame, textvariable=unit_var, width=25, font=Styles.TEXT_FONT).grid(row=3, column=1, pady=8, padx=5)
+        tk.Entry(frame, textvariable=unit_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
+        # 右列字段
         # 供应商
-        tk.Label(form_frame, text="供应商", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=4, column=0, sticky='w', pady=8)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="供应商", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         supplier_var = tk.StringVar()
-        supplier_entry = tk.Entry(form_frame, textvariable=supplier_var, width=25, font=Styles.TEXT_FONT)
-        supplier_entry.grid(row=4, column=1, pady=8, padx=5)
-        
-        btn_select_supplier = tk.Button(form_frame, text="选择...", font=Styles.BUTTON_FONT,
-                                        width=10, command=lambda: self._select_supplier_dialog(supplier_var),
-                                        bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=3)
-        btn_select_supplier.grid(row=4, column=2, pady=8)
+        entry_frame = tk.Frame(frame, bg=Styles.BACKGROUND_COLOR)
+        entry_frame.pack(fill=tk.X)
+        tk.Entry(entry_frame, textvariable=supplier_var, font=Styles.TEXT_FONT).pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(2, 0))
+        btn_select_supplier = tk.Button(entry_frame, text="选择...", font=Styles.TEXT_FONT,
+                                        width=8, command=lambda: self._select_supplier_dialog(supplier_var),
+                                        bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=2)
+        btn_select_supplier.pack(side=tk.LEFT, padx=(5, 0))
         btn_select_supplier.bind("<Enter>", lambda e, b=btn_select_supplier: b.config(bg=Styles.BUTTON_HOVER_COLOR))
         btn_select_supplier.bind("<Leave>", lambda e, b=btn_select_supplier: b.config(bg=Styles.PRIMARY_COLOR))
 
         # 进货日期
-        tk.Label(form_frame, text="进货日期 (YYYY-MM-DD)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=5, column=0, sticky='w', pady=8)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="进货日期 (YYYY-MM-DD)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         stock_date_var = tk.StringVar(value=datetime.now().strftime("%Y-%m-%d"))
-        tk.Entry(form_frame, textvariable=stock_date_var, width=25, font=Styles.TEXT_FONT).grid(row=5, column=1, pady=8, padx=5)
+        tk.Entry(frame, textvariable=stock_date_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 备注
-        tk.Label(form_frame, text="备注", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=6, column=0, sticky='w', pady=8)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="备注", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         remarks_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=remarks_var, width=25, font=Styles.TEXT_FONT).grid(row=6, column=1, pady=8, padx=5)
+        tk.Entry(frame, textvariable=remarks_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         def submit():
             try:
@@ -2233,10 +2357,10 @@ class TeaInventoryGUI:
 
     def add_supplier_gui(self):
         """添加供应商GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("add_supplier", 680, 520)
         top.title("添加供应商")
-        top.geometry("600x500")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2250,38 +2374,58 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        form_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        form_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM)
+        # 表单容器 - 两列布局
+        form_container = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        form_container.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM)
+        
+        left_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+        right_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
+        # 左列字段
         # 供应商编号
-        tk.Label(form_frame, text="供应商编号 (留空自动生成)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=5)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="供应商编号 (留空自动生成)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         supplier_id_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=supplier_id_var, width=30, font=Styles.TEXT_FONT).grid(row=0, column=1, pady=5)
+        tk.Entry(frame, textvariable=supplier_id_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 供应商名称
-        tk.Label(form_frame, text="供应商名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=1, column=0, sticky='w', pady=5)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="供应商名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         name_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=name_var, width=30, font=Styles.TEXT_FONT).grid(row=1, column=1, pady=5)
+        tk.Entry(frame, textvariable=name_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 联系人
-        tk.Label(form_frame, text="联系人", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=2, column=0, sticky='w', pady=5)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="联系人", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         contact_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=contact_var, width=30, font=Styles.TEXT_FONT).grid(row=2, column=1, pady=5)
+        tk.Entry(frame, textvariable=contact_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
+        # 右列字段
         # 联系电话
-        tk.Label(form_frame, text="联系电话", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=3, column=0, sticky='w', pady=5)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="联系电话", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         phone_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=phone_var, width=30, font=Styles.TEXT_FONT).grid(row=3, column=1, pady=5)
+        tk.Entry(frame, textvariable=phone_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 地址
-        tk.Label(form_frame, text="地址", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=4, column=0, sticky='w', pady=5)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="地址", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         address_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=address_var, width=30, font=Styles.TEXT_FONT).grid(row=4, column=1, pady=5)
+        tk.Entry(frame, textvariable=address_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 备注
-        tk.Label(form_frame, text="备注", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=5, column=0, sticky='w', pady=5)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="备注", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         remarks_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=remarks_var, width=30, font=Styles.TEXT_FONT).grid(row=5, column=1, pady=5)
+        tk.Entry(frame, textvariable=remarks_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         def submit():
             try:
@@ -2336,10 +2480,10 @@ class TeaInventoryGUI:
 
     def update_supplier_gui(self):
         """修改供应商GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("update_supplier", 500, 320)
         top.title("修改供应商")
-        top.geometry("400x300")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2372,10 +2516,10 @@ class TeaInventoryGUI:
             supplier_row = supplier.iloc[0]
 
             # 创建修改窗口
-            edit_top = tk.Toplevel(top)
+            edit_top = self._create_toplevel_with_size("edit_supplier", 680, 450, parent=top)
             edit_top.title("修改供应商信息")
-            edit_top.geometry("600x400")
             edit_top.configure(bg=Styles.BACKGROUND_COLOR)
+            edit_top.resizable(True, True)
 
             # 创建标题区域
             edit_title_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
@@ -2389,24 +2533,46 @@ class TeaInventoryGUI:
                 fg=Styles.HEADER_COLOR
             ).pack()
 
-            form_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
-            form_frame.pack(pady=Styles.PADY_MEDIUM)
+            # 表单容器 - 两列布局
+            form_container = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
+            form_container.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM)
+            
+            left_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+            right_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+            left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+            right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
             # 创建变量
             vars = {}
-            fields = [
+            
+            # 左列字段
+            fields_left = [
                 ("供应商名称", "供应商名称", supplier_row['供应商名称']),
-                ("联系人", "联系人", supplier_row['联系人']),
+                ("联系人", "联系人", supplier_row['联系人'])
+            ]
+            
+            for label, key, value in fields_left:
+                frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+                frame.pack(fill=tk.X, pady=4)
+                tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+                var = tk.StringVar(value=str(value) if pd.notna(value) else "")
+                vars[key] = var
+                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+            
+            # 右列字段
+            fields_right = [
                 ("联系电话", "联系电话", supplier_row['联系电话']),
                 ("地址", "地址", supplier_row['地址']),
                 ("备注", "备注", supplier_row['备注'])
             ]
-
-            for i, (label, key, value) in enumerate(fields):
-                tk.Label(form_frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=i, column=0, sticky='w', pady=5)
-                var = tk.StringVar(value=str(value))
+            
+            for label, key, value in fields_right:
+                frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+                frame.pack(fill=tk.X, pady=4)
+                tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+                var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(form_frame, textvariable=var, width=30, font=Styles.TEXT_FONT).grid(row=i, column=1, pady=5)
+                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
             def save():
                 updates = {}
@@ -2468,10 +2634,10 @@ class TeaInventoryGUI:
 
     def delete_supplier_gui(self):
         """删除供应商GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("delete_supplier", 500, 320)
         top.title("删除供应商")
-        top.geometry("400x300")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2556,10 +2722,10 @@ class TeaInventoryGUI:
 
     def add_customer_gui(self):
         """添加客户GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("add_customer", 680, 480)
         top.title("添加客户")
-        top.geometry("600x400")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2573,33 +2739,51 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        form_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
-        form_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM)
+        # 表单容器 - 两列布局
+        form_container = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        form_container.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM)
+        
+        left_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+        right_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+        left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
+        # 左列字段
         # 客户编号
-        tk.Label(form_frame, text="客户编号 (留空自动生成)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=0, column=0, sticky='w', pady=5)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="客户编号 (留空自动生成)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         customer_id_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=customer_id_var, width=30, font=Styles.TEXT_FONT).grid(row=0, column=1, pady=5)
+        tk.Entry(frame, textvariable=customer_id_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 客户名称
-        tk.Label(form_frame, text="客户名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=1, column=0, sticky='w', pady=5)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="客户名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         name_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=name_var, width=30, font=Styles.TEXT_FONT).grid(row=1, column=1, pady=5)
+        tk.Entry(frame, textvariable=name_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 联系电话
-        tk.Label(form_frame, text="联系电话", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=2, column=0, sticky='w', pady=5)
+        frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="联系电话", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         phone_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=phone_var, width=30, font=Styles.TEXT_FONT).grid(row=2, column=1, pady=5)
+        tk.Entry(frame, textvariable=phone_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
+        # 右列字段
         # 地址
-        tk.Label(form_frame, text="地址", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=3, column=0, sticky='w', pady=5)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="地址", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         address_var = tk.StringVar()
-        tk.Entry(form_frame, textvariable=address_var, width=30, font=Styles.TEXT_FONT).grid(row=3, column=1, pady=5)
+        tk.Entry(frame, textvariable=address_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         # 累计消费
-        tk.Label(form_frame, text="累计消费", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=4, column=0, sticky='w', pady=5)
+        frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+        frame.pack(fill=tk.X, pady=4)
+        tk.Label(frame, text="累计消费", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         total_purchases_var = tk.StringVar(value="0")
-        tk.Entry(form_frame, textvariable=total_purchases_var, width=30, font=Styles.TEXT_FONT).grid(row=4, column=1, pady=5)
+        tk.Entry(frame, textvariable=total_purchases_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
         def submit():
             try:
@@ -2657,10 +2841,10 @@ class TeaInventoryGUI:
 
     def update_customer_gui(self):
         """修改客户GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("update_customer", 500, 320)
         top.title("修改客户")
-        top.geometry("400x300")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2693,10 +2877,10 @@ class TeaInventoryGUI:
             customer_row = customer.iloc[0]
 
             # 创建修改窗口
-            edit_top = tk.Toplevel(top)
+            edit_top = self._create_toplevel_with_size("edit_customer", 680, 450, parent=top)
             edit_top.title("修改客户信息")
-            edit_top.geometry("600x400")
             edit_top.configure(bg=Styles.BACKGROUND_COLOR)
+            edit_top.resizable(True, True)
 
             # 创建标题区域
             edit_title_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
@@ -2710,23 +2894,45 @@ class TeaInventoryGUI:
                 fg=Styles.HEADER_COLOR
             ).pack()
 
-            form_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
-            form_frame.pack(pady=Styles.PADY_MEDIUM)
+            # 表单容器 - 两列布局
+            form_container = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
+            form_container.pack(pady=Styles.PADY_SMALL, padx=Styles.PADX_MEDIUM)
+            
+            left_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+            right_col = tk.Frame(form_container, bg=Styles.BACKGROUND_COLOR)
+            left_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+            right_col.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(10, 0))
 
             # 创建变量
             vars = {}
-            fields = [
+            
+            # 左列字段
+            fields_left = [
                 ("客户名称", "客户名称", customer_row['客户名称']),
-                ("联系电话", "联系电话", customer_row['联系电话']),
+                ("联系电话", "联系电话", customer_row['联系电话'])
+            ]
+            
+            for label, key, value in fields_left:
+                frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
+                frame.pack(fill=tk.X, pady=4)
+                tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+                var = tk.StringVar(value=str(value) if pd.notna(value) else "")
+                vars[key] = var
+                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+            
+            # 右列字段
+            fields_right = [
                 ("地址", "地址", customer_row['地址']),
                 ("累计消费", "累计消费", customer_row['累计消费'])
             ]
-
-            for i, (label, key, value) in enumerate(fields):
-                tk.Label(form_frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).grid(row=i, column=0, sticky='w', pady=5)
-                var = tk.StringVar(value=str(value))
+            
+            for label, key, value in fields_right:
+                frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
+                frame.pack(fill=tk.X, pady=4)
+                tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
+                var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(form_frame, textvariable=var, width=30, font=Styles.TEXT_FONT).grid(row=i, column=1, pady=5)
+                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
 
             def save():
                 updates = {}
@@ -2800,10 +3006,10 @@ class TeaInventoryGUI:
 
     def delete_customer_gui(self):
         """删除客户GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("delete_customer", 500, 320)
         top.title("删除客户")
-        top.geometry("400x300")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2892,10 +3098,10 @@ class TeaInventoryGUI:
 
     def query_sales_by_customer_gui(self):
         """按客户查询销售记录GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("query_sales_by_customer", 700, 360)
         top.title("按客户查询销售记录")
-        top.geometry("600x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -2959,10 +3165,10 @@ class TeaInventoryGUI:
 
     def query_sales_by_product_gui(self):
         """按商品查询销售记录GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("query_sales_by_product", 700, 360)
         top.title("按商品查询销售记录")
-        top.geometry("600x350")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -3026,10 +3232,10 @@ class TeaInventoryGUI:
 
     def query_sales_by_date_gui(self):
         """按日期查询销售记录GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("query_sales_by_date", 500, 380)
         top.title("按日期查询销售记录")
-        top.geometry("400x400")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -3118,10 +3324,10 @@ class TeaInventoryGUI:
 
     def sales_statistics_gui(self):
         """销售统计GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("sales_statistics", 760, 480)
         top.title("销售统计")
-        top.geometry("800x600")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -3235,10 +3441,10 @@ class TeaInventoryGUI:
 
     def statistics_by_time_gui(self):
         """按时间统计GUI"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("statistics_by_time", 700, 360)
         top.title("按时间统计")
-        top.geometry("900x400")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
 
         # 创建标题区域
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -3394,10 +3600,10 @@ class TeaInventoryGUI:
             profit_margin = (total_profit / total_income * 100) if total_income > 0 else 0
 
             # 显示盈利分析结果
-            result_window = tk.Toplevel(self.root)
+            result_window = self._create_toplevel_with_size("profit_analysis", 680, 450)
             result_window.title("盈利分析")
-            result_window.geometry("600x400")
             result_window.configure(bg=Styles.BACKGROUND_COLOR)
+            result_window.resizable(True, True)
 
             # 创建标题区域
             result_title_frame = tk.Frame(result_window, bg=Styles.BACKGROUND_COLOR)
@@ -3449,10 +3655,10 @@ class TeaInventoryGUI:
 
     def data_visualization_gui(self):
         """数据可视化GUI - 现代化设计"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("data_visualization", 800, 520)
         top.title("数据可视化")
-        top.geometry("900x650")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
         
         # 主容器
         main_container = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -3501,10 +3707,10 @@ class TeaInventoryGUI:
     
     def show_sales_trend_options(self):
         """显示销售趋势图选项"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("sales_trend_options", 450, 300)
         top.title("销售趋势图 - 选择时间周期")
-        top.geometry("400x300")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
         
         tk.Label(top, text="选择时间周期", font=Styles.SUB_HEADER_FONT,
                  bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.PADY_LARGE)
@@ -3534,10 +3740,10 @@ class TeaInventoryGUI:
     
     def show_profit_trend_options(self):
         """显示利润趋势图选项"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("profit_trend_options", 450, 300)
         top.title("利润趋势图 - 选择时间周期")
-        top.geometry("400x300")
         top.configure(bg=Styles.BACKGROUND_COLOR)
+        top.resizable(True, True)
         
         tk.Label(top, text="选择时间周期", font=Styles.SUB_HEADER_FONT,
                  bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.PADY_LARGE)
@@ -3577,9 +3783,10 @@ class TeaInventoryGUI:
 
     def show_dataframe_window(self, df, title):
         """显示DataFrame的窗口（带分页功能）"""
-        top = tk.Toplevel(self.root)
+        # 基于标题生成窗口ID（替换特殊字符）
+        window_id = "dataframe_" + title.replace(" ", "_").replace("（", "").replace("）", "").replace("-", "_")
+        top = self._create_toplevel_with_size(window_id, Styles.WINDOW_WIDTH, Styles.WINDOW_HEIGHT)
         top.title(title)
-        top.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
         top.configure(bg=Styles.BACKGROUND_COLOR)
         
         PAGE_SIZE = 100
@@ -3862,10 +4069,10 @@ class TeaInventoryGUI:
                 
                 commodity = self.system.excel_manager.get_commodity_by_id(com_id)
                 if commodity is not None:
-                    info_top = tk.Toplevel(top)
+                    info_top = self._create_toplevel_with_size("dataframe_product_detail", 700, 500, parent=top)
                     info_top.title("商品详情")
-                    info_top.geometry("700x500")
                     info_top.configure(bg=Styles.BACKGROUND_COLOR)
+                    info_top.resizable(True, True)
                     
                     frame = tk.Frame(info_top, bg=Styles.BACKGROUND_COLOR)
                     frame.pack(pady=Styles.PADY_LARGE, padx=Styles.PADX_LARGE)
@@ -3909,10 +4116,10 @@ class TeaInventoryGUI:
                         supplier_row = supplier.iloc[0]
                         
                         # 创建修改窗口
-                        edit_top = tk.Toplevel(top)
+                        edit_top = self._create_toplevel_with_size("dataframe_edit_supplier", 600, 400, parent=top)
                         edit_top.title("修改供应商信息")
-                        edit_top.geometry("600x400")
                         edit_top.configure(bg=Styles.BACKGROUND_COLOR)
+                        edit_top.resizable(True, True)
                         
                         # 创建标题区域
                         edit_title_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
@@ -4003,10 +4210,10 @@ class TeaInventoryGUI:
                         customer_row = customer.iloc[0]
                         
                         # 创建修改窗口
-                        edit_top = tk.Toplevel(top)
+                        edit_top = self._create_toplevel_with_size("dataframe_edit_customer", 600, 500, parent=top)
                         edit_top.title("修改客户信息")
-                        edit_top.geometry("600x500")
                         edit_top.configure(bg=Styles.BACKGROUND_COLOR)
+                        edit_top.resizable(True, True)
                         
                         # 创建标题区域
                         edit_title_frame = tk.Frame(edit_top, bg=Styles.BACKGROUND_COLOR)
@@ -4243,9 +4450,8 @@ class TeaInventoryGUI:
     
     def backup_management(self):
         """数据备份管理界面"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("backup_management", Styles.WINDOW_WIDTH, Styles.WINDOW_HEIGHT)
         top.title("数据备份管理")
-        top.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
         top.configure(bg=Styles.BACKGROUND_COLOR)
         
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -4444,9 +4650,8 @@ class TeaInventoryGUI:
     
     def log_management(self):
         """操作日志管理界面"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("log_management", Styles.WINDOW_WIDTH, Styles.WINDOW_HEIGHT)
         top.title("操作日志查询")
-        top.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
         top.configure(bg=Styles.BACKGROUND_COLOR)
         
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -4567,9 +4772,8 @@ class TeaInventoryGUI:
     
     def cloud_sync_management(self):
         """云端同步管理界面 - SFTP 版本"""
-        top = tk.Toplevel(self.root)
+        top = self._create_toplevel_with_size("cloud_sync_management", Styles.WINDOW_WIDTH, Styles.WINDOW_HEIGHT)
         top.title("云端同步管理 - SFTP")
-        top.geometry(f"{Styles.WINDOW_WIDTH}x{Styles.WINDOW_HEIGHT}")
         top.configure(bg=Styles.BACKGROUND_COLOR)
         
         title_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)

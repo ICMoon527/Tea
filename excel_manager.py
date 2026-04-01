@@ -15,7 +15,7 @@ class ExcelManager:
         self.init_excel_file()
 
     def init_excel_file(self):
-        """初始化Excel文件，创建必要的工作表"""
+        """初始化Excel文件，创建必要的工作表并检查结构"""
         if not os.path.exists(self.filename):
             wb = Workbook()
 
@@ -45,7 +45,7 @@ class ExcelManager:
             # 创建供应商表
             ws_supplier = wb.create_sheet("供应商")
             ws_supplier.append([
-                "供应商编号", "供应商名称", "联系人", "联系电话", "地址", "备注"
+                "供应商编号", "供应商名称", "联系人", "联系电话", "地址", "累计交易金额", "备注"
             ])
 
             # 创建客户表
@@ -56,6 +56,29 @@ class ExcelManager:
             ])
 
             wb.save(self.filename)
+        else:
+            # 如果文件已存在，检查并修复供应商表结构
+            try:
+                wb = load_workbook(self.filename)
+                if "供应商" in wb.sheetnames:
+                    ws = wb["供应商"]
+                    # 检查列数是否正确
+                    if ws.max_row > 0:
+                        first_row = [cell.value for cell in ws[1]]
+                        expected_columns = ["供应商编号", "供应商名称", "联系人", "联系电话", "地址", "累计交易金额", "备注"]
+                        if first_row != expected_columns:
+                            # 需要修复供应商表结构
+                            df = pd.read_excel(self.filename, sheet_name="供应商", engine='openpyxl')
+                            # 添加缺失的列
+                            if "累计交易金额" not in df.columns:
+                                df["累计交易金额"] = 0.0
+                            # 确保列顺序正确
+                            df = df[expected_columns]
+                            # 重写供应商表
+                            self.write_sheet("供应商", df)
+                wb.close()
+            except Exception as e:
+                print(f"检查Excel文件结构时出错: {e}")
     
     def read_sheet(self, sheet_name):
         """读取指定工作表的数据（带缓存）"""
@@ -93,7 +116,7 @@ class ExcelManager:
                 "商品信息": ["商品编号", "茶类", "品种", "公司", "产区", "商品名称", "规格", "成本价", "零售价", "生产日期", "保质期(月)", "当前库存", "品质特征", "年份", "等级", "单位"],
                 "销售记录": ["销售编号", "商品编号", "商品名称", "销售数量", "单价", "应收金额", "实收金额", "客户名称", "销售日期", "销售单位", "是否作废"],
                 "进货记录": ["进货编号", "商品编号", "商品名称", "进货数量", "进货单价", "供应商", "进货日期", "备注", "进货单位"],
-                "供应商": ["供应商编号", "供应商名称", "联系人", "联系电话", "地址", "备注"],
+                "供应商": ["供应商编号", "供应商名称", "联系人", "联系电话", "地址", "累计交易金额", "备注"],
                 "客户信息": ["客户编号", "客户名称", "联系电话", "电子邮箱", "地址", "累计消费", "订单数", "最后购买日期", "客户等级", "备注", "创建日期"]
             }
             
@@ -281,18 +304,45 @@ class ExcelManager:
     def add_stock(self, stock_data):
         self.append_to_sheet("进货记录", stock_data)
         
-        # 更新库存
+        # 更新库存和计算移动加权平均成本价
         commodity = self.get_commodity_by_id(stock_data[1])  # 商品编号在第二列
         if commodity is not None:
             current_stock = float(commodity['当前库存'])
+            current_cost_price = float(commodity['成本价']) if pd.notna(commodity['成本价']) else 0.0
+            
             stock_qty = float(stock_data[3])  # 进货数量在第四列
+            stock_unit_price = float(stock_data[4])  # 进货单价在第五列
             stock_unit = stock_data[8] if len(stock_data) > 8 else '斤'  # 进货单位在第9列
             
-            # 使用convert_to_jin函数转换
+            # 使用convert_to_jin函数转换进货数量为斤
             stock_qty_jin = convert_to_jin(stock_qty, stock_unit)
             
-            new_stock = current_stock + stock_qty_jin
-            self.update_commodity(stock_data[1], {'当前库存': new_stock})
+            # 计算进货单价（转换为每斤的价格）
+            # 如果进货单位是克，进货单价需要乘以500得到每斤价格
+            if stock_unit == '克':
+                stock_unit_price_per_jin = stock_unit_price * 500
+            else:
+                stock_unit_price_per_jin = stock_unit_price
+            
+            # 计算移动加权平均成本价
+            # 公式：(当前成本价×当前库存 + 新进货单价×新进货数量) / (当前库存 + 新进货数量)
+            total_current_cost = current_cost_price * current_stock
+            total_new_cost = stock_unit_price_per_jin * stock_qty_jin
+            total_stock = current_stock + stock_qty_jin
+            
+            if total_stock > 0:
+                new_cost_price = (total_current_cost + total_new_cost) / total_stock
+                # 保留两位小数
+                new_cost_price = round(new_cost_price, 2)
+            else:
+                new_cost_price = stock_unit_price_per_jin
+            
+            # 同时更新库存和成本价
+            updates = {
+                '当前库存': total_stock,
+                '成本价': new_cost_price
+            }
+            self.update_commodity(stock_data[1], updates)
         
         # 更新供应商信息
         supplier_name = stock_data[5]  # 供应商名称在第6列
@@ -359,6 +409,11 @@ class ExcelManager:
     def update_supplier_after_stock(self, supplier_name, amount, stock_date):
         """进货后更新供应商信息"""
         df = self.read_sheet("供应商")
+        
+        # 检查并添加累计交易金额列（如果缺失）
+        if "累计交易金额" not in df.columns:
+            df["累计交易金额"] = 0.0
+        
         if df.empty:
             # 如果供应商表为空，创建新供应商
             self._create_new_supplier(supplier_name, amount, stock_date)
@@ -387,7 +442,7 @@ class ExcelManager:
         
         # 创建供应商数据（包含初始累计交易金额）
         supplier_data = [
-            supplier_id, supplier_name, "", "", "", amount
+            supplier_id, supplier_name, "", "", "", amount, ""
         ]
         
         self.append_to_sheet("供应商", supplier_data)

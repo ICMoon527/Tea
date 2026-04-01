@@ -5,16 +5,143 @@ from stock_record import StockRecord
 from supplier import Supplier
 from customer import Customer
 from data_visualization import DataVisualization
+from utils import convert_to_jin
 from datetime import datetime, timedelta
 import pandas as pd
 from prettytable import PrettyTable
 import textwrap
 
+
+class ShoppingCart:
+    """Shopping cart management class"""
+    
+    def __init__(self, excel_manager):
+        self.excel_manager = excel_manager
+        self.items = []
+    
+    def add_item(self, com_id, quantity, unit):
+        commodity = self.excel_manager.get_commodity_by_id(com_id)
+        if commodity is None:
+            return {'success': False, 'message': 'Product not found'}
+        
+        available_stock = float(commodity['当前库存'])
+        quantity_in_jin = convert_to_jin(quantity, unit)
+        
+        if quantity_in_jin > available_stock:
+            msg = 'Insufficient stock! Available: ' + str(available_stock) + ' jin'
+            return {'success': False, 'message': msg}
+        
+        for item in self.items:
+            if item['商品编号'] == com_id:
+                item['购买数量'] = quantity
+                item['购买单位'] = unit
+                item['小计'] = self._calculate_subtotal(quantity, unit, float(commodity['零售价']))
+                return {'success': True, 'message': 'Cart updated'}
+        
+        cart_item = {
+            '商品编号': com_id,
+            '商品名称': commodity['商品名称'],
+            '单价(每斤)': float(commodity['零售价']),
+            '购买数量': quantity,
+            '购买单位': unit,
+            '小计': self._calculate_subtotal(quantity, unit, float(commodity['零售价']))
+        }
+        
+        self.items.append(cart_item)
+        return {'success': True, 'message': 'Added to cart'}
+    
+    def _calculate_subtotal(self, quantity, unit, unit_price):
+        if unit == '斤':
+            return quantity * unit_price
+        else:
+            return (quantity / 500) * unit_price
+    
+    def remove_item(self, com_id):
+        for i, item in enumerate(self.items):
+            if item['商品编号'] == com_id:
+                self.items.pop(i)
+                return True
+        return False
+    
+    def clear(self):
+        self.items.clear()
+    
+    def is_empty(self):
+        return len(self.items) == 0
+    
+    def get_total_amount(self):
+        return sum(item['小计'] for item in self.items)
+    
+    def get_items(self):
+        return self.items.copy()
+    
+    def update_item_quantity(self, com_id, new_quantity, new_unit=None):
+        for item in self.items:
+            if item['商品编号'] == com_id:
+                commodity = self.excel_manager.get_commodity_by_id(com_id)
+                if commodity is None:
+                    return {'success': False, 'message': 'Product not found'}
+                
+                unit_to_use = new_unit if new_unit is not None else item['购买单位']
+                quantity_in_jin = convert_to_jin(new_quantity, unit_to_use)
+                available_stock = float(commodity['当前库存'])
+                
+                if quantity_in_jin > available_stock:
+                    msg = 'Insufficient stock! Available: ' + str(available_stock) + ' jin'
+                    return {'success': False, 'message': msg}
+                
+                item['购买数量'] = new_quantity
+                item['购买单位'] = unit_to_use
+                item['小计'] = self._calculate_subtotal(new_quantity, unit_to_use, float(commodity['零售价']))
+                return {'success': True, 'message': 'Quantity updated'}
+        
+        return {'success': False, 'message': 'Item not found in cart'}
+    
+    def checkout(self, customer_name, received_amount):
+        total_amount = self.get_total_amount()
+        
+        if received_amount < total_amount and total_amount > 0:
+            discount_ratio = received_amount / total_amount
+        else:
+            discount_ratio = 1.0
+        
+        from sale_record import SaleRecord
+        
+        for item in self.items:
+            sale_id = self.excel_manager.generate_id('S', '销售记录', '销售编号')
+            quantity_in_jin = convert_to_jin(item['购买数量'], item['购买单位'])
+            item_received_amount = item['小计'] * discount_ratio
+            
+            sale_record = SaleRecord(
+                sale_id=sale_id,
+                com_id=item['商品编号'],
+                com_name=item['商品名称'],
+                quantity=quantity_in_jin,
+                unit_price=item['单价(每斤)'],
+                total_amount=item['小计'],
+                received_amount=item_received_amount,
+                customer_name=customer_name,
+                sale_unit=item['购买单位']
+            )
+            self.excel_manager.add_sale(sale_record.to_list())
+        
+        self.clear()
+        
+        discount = total_amount - received_amount if received_amount < total_amount else 0
+        return {
+            'success': True,
+            'total_amount': total_amount,
+            'received_amount': received_amount,
+            'change': received_amount - total_amount,
+            'discount_amount': discount
+        }
+
+
 class TeaInventorySystem:
     def __init__(self):
         self.excel_manager = ExcelManager()
         self.data_viz = DataVisualization(self.excel_manager)
-        self.shopping_cart = []
+        self.shopping_cart = ShoppingCart(self.excel_manager)
     
     # 商品管理功能
     def add_commodity(self):
@@ -338,30 +465,28 @@ class TeaInventorySystem:
     
     def view_cart(self):
         """查看购物车"""
-        if not self.shopping_cart:
+        if self.shopping_cart.is_empty():
             print("购物车为空")
             return
         
         table = PrettyTable(['商品编号', '商品名称', '单价(每斤)', '数量', '单位', '小计'])
-        total = 0
         
-        for item in self.shopping_cart:
+        for item in self.shopping_cart.get_items():
             table.add_row([
-                item['商品编号'], 
-                item['商品名称'], 
-                item['单价(每斤)'], 
-                item['购买数量'], 
-                item['购买单位'], 
+                item['商品编号'],
+                item['商品名称'],
+                item['单价(每斤)'],
+                item['购买数量'],
+                item['购买单位'],
                 item['小计']
             ])
-            total += item['小计']
         
         print(table)
-        print(f"总计: {total:.2f} 元")
+        print(f"总计: {self.shopping_cart.get_total_amount():.2f} 元")
     
     def clear_cart(self):
         """清空购物车"""
-        if not self.shopping_cart:
+        if self.shopping_cart.is_empty():
             print("购物车已经为空")
             return
         
@@ -374,14 +499,14 @@ class TeaInventorySystem:
     
     def checkout(self):
         """结账"""
-        if not self.shopping_cart:
+        if self.shopping_cart.is_empty():
             print("购物车为空，无法结账")
             return
         
-        customer_name = input("请输入客户名称: ").strip()
-        
-        total_amount = sum(item['小计'] for item in self.shopping_cart)
+        total_amount = self.shopping_cart.get_total_amount()
         print(f"应付总额: {total_amount:.2f} 元")
+        
+        customer_name = input("请输入客户名称: ").strip()
         
         try:
             received_amount = float(input("请输入实收金额: "))
@@ -402,11 +527,8 @@ class TeaInventorySystem:
                 print(f"销售继续，折扣金额: {total_amount - received_amount:.2f} 元")
         
         # 生成销售记录并保存
-        # 如果有折扣，需要按比例分配实际收到的金额给每个商品
-        if received_amount < total_amount and total_amount > 0:
-            discount_ratio = received_amount / total_amount
-        else:
-            discount_ratio = 1.0
+        # 无论实收金额是高还是低，都按比例分配给每个商品
+        discount_ratio = received_amount / total_amount if total_amount > 0 else 1.0
             
         for item in self.shopping_cart:
             sale_id = self.excel_manager.generate_id("S", "销售记录", "销售编号")
@@ -429,7 +551,12 @@ class TeaInventorySystem:
             )
             self.excel_manager.add_sale(sale_record.to_list())
         
-        print(f"结账成功！找零: {received_amount - total_amount:.2f} 元")
+        if received_amount < total_amount:
+            print(f"结账成功！折扣金额: {total_amount - received_amount:.2f} 元")
+        elif received_amount > total_amount:
+            print(f"结账成功！溢价金额: {received_amount - total_amount:.2f} 元")
+        else:
+            print("结账成功！")
         print("销售记录已保存")
         
         # 清空购物车
