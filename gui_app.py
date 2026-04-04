@@ -1485,28 +1485,11 @@ class TeaInventoryGUI:
                                     messagebox.showerror("错误", "库存不足！")
                                     return
                             
-                            # 添加到购物车
-                            cart_item = {
-                                '商品编号': com_id,
-                                '商品名称': com_name,
-                                '单价(每斤)': retail_price,
-                                '购买数量': quantity,
-                                '购买单位': unit,
-                                '小计': (quantity / 500) * retail_price if unit == "克" else quantity * retail_price
-                            }
-                            
-                            # 检查是否已存在
-                            existing = False
-                            for item in self.system.shopping_cart:
-                                if item['商品编号'] == com_id:
-                                    item['购买数量'] = quantity
-                                    item['购买单位'] = unit
-                                    item['小计'] = (quantity / 500) * retail_price if unit == "克" else quantity * retail_price
-                                    existing = True
-                                    break
-                            
-                            if not existing:
-                                self.system.shopping_cart.append(cart_item)
+                            # 添加到购物车 - 使用 ShoppingCart 的方法
+                            result = self.system.shopping_cart.add_item(com_id, quantity, unit)
+                            if not result['success']:
+                                messagebox.showerror("错误", result['message'])
+                                return
                             
                             messagebox.showinfo("成功", f"已添加到购物车！\n商品: {com_name}\n数量: {quantity} {unit}")
                             top.destroy()
@@ -1576,7 +1559,7 @@ class TeaInventoryGUI:
             fg=Styles.HEADER_COLOR
         ).pack()
 
-        if not self.system.shopping_cart:
+        if self.system.shopping_cart.is_empty():
             tk.Label(top, text="购物车为空", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XL)
             # 购物车为空时的关闭按钮
             btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
@@ -1600,7 +1583,7 @@ class TeaInventoryGUI:
                 tree.column(col, width=130, anchor=tk.CENTER)
             
             total = 0
-            for item in self.system.shopping_cart:
+            for item in self.system.shopping_cart.get_items():
                 tree.insert("", tk.END, values=[
                     item['商品编号'],
                     item['商品名称'],
@@ -1632,26 +1615,23 @@ class TeaInventoryGUI:
                 current_quantity = values[3]
                 unit = values[4]
                 
-                # 查找对应的购物车项目
-                for cart_item in self.system.shopping_cart:
-                    if cart_item['商品编号'] == com_id:
-                        # 弹出输入框修改数量
-                        new_quantity = simpledialog.askfloat(
-                            "修改数量", 
-                            f"请输入新的购买数量 ({unit}):",
-                            initialvalue=current_quantity,
-                            minvalue=0.1
-                        )
-                        
-                        if new_quantity is not None:
-                            # 更新购物车
-                            cart_item['购买数量'] = new_quantity
-                            cart_item['小计'] = (new_quantity / 500) * cart_item['单价(每斤)'] if unit == "克" else new_quantity * cart_item['单价(每斤)']
-                            
-                            # 重新显示购物车
-                            top.destroy()
-                            self.view_cart_gui()
-                        break
+                # 弹出输入框修改数量
+                new_quantity = simpledialog.askfloat(
+                    "修改数量", 
+                    f"请输入新的购买数量 ({unit}):",
+                    initialvalue=current_quantity,
+                    minvalue=0.1
+                )
+                
+                if new_quantity is not None:
+                    # 使用 ShoppingCart 的方法更新数量
+                    result = self.system.shopping_cart.update_item_quantity(com_id, new_quantity, unit)
+                    if result['success']:
+                        # 重新显示购物车
+                        top.destroy()
+                        self.view_cart_gui()
+                    else:
+                        messagebox.showerror("错误", result['message'])
             
             # 绑定双击事件
             tree.bind('<Double-1>', double_click_modify)
@@ -1670,11 +1650,8 @@ class TeaInventoryGUI:
                 com_name = values[1]
                 
                 if messagebox.askyesno("确认", f"确定要删除商品 '{com_name}' 吗？"):
-                    # 从购物车中删除
-                    for i, cart_item in enumerate(self.system.shopping_cart):
-                        if cart_item['商品编号'] == com_id:
-                            self.system.shopping_cart.pop(i)
-                            break
+                    # 使用 ShoppingCart 的方法删除
+                    self.system.shopping_cart.remove_item(com_id)
                     
                     # 重新显示购物车
                     top.destroy()
@@ -1697,7 +1674,7 @@ class TeaInventoryGUI:
 
     def clear_cart_gui(self):
         """清空购物车GUI"""
-        if not self.system.shopping_cart:
+        if self.system.shopping_cart.is_empty():
             messagebox.showinfo("提示", "购物车已经为空")
             return
         
@@ -1707,7 +1684,7 @@ class TeaInventoryGUI:
 
     def checkout_gui(self):
         """结账GUI"""
-        if not self.system.shopping_cart:
+        if self.system.shopping_cart.is_empty():
             messagebox.showerror("错误", "购物车为空，无法结账")
             return
         
@@ -1729,7 +1706,8 @@ class TeaInventoryGUI:
         ).pack()
 
         # 显示购物车内容
-        total_amount = sum(item['小计'] for item in self.system.shopping_cart)
+        cart_items = self.system.shopping_cart.get_items()
+        total_amount = sum(item['小计'] for item in cart_items)
         
         frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         frame.pack(pady=Styles.SPACING_XS, fill=tk.BOTH, expand=True, padx=Styles.SPACING_LG)
@@ -1742,7 +1720,7 @@ class TeaInventoryGUI:
             tree.heading(col, text=col)
             tree.column(col, width=140, anchor=tk.CENTER)
         
-        for item in self.system.shopping_cart:
+        for item in cart_items:
             tree.insert("", tk.END, values=[
                 item['商品名称'],
                 item['购买数量'],
@@ -1791,7 +1769,7 @@ class TeaInventoryGUI:
                 discount_ratio = received_amount / total_amount if total_amount > 0 else 1.0
                 
                 # 处理销售记录 - 统一以"斤"为单位
-                for item in self.system.shopping_cart:
+                for item in self.system.shopping_cart.get_items():
                     sale_id = self.system.excel_manager.generate_id("S", "销售记录", "销售编号")
                     # 将数量转换为斤
                     quantity_in_jin = item['购买数量'] / 500 if item['购买单位'] == "克" else item['购买数量']

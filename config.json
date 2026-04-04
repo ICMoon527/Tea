@@ -89,6 +89,10 @@
     "delete_customer": {
       "width": 500,
       "height": 320
+    },
+    "stock_in": {
+      "width": 800,
+      "height": 600
     }
   },
   "export": {
