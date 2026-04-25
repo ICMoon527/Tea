@@ -93,6 +93,14 @@
     "stock_in": {
       "width": 800,
       "height": 600
+    },
+    "dataframe_商品列表": {
+      "width": 1280,
+      "height": 700
+    },
+    "cloud_sync_management": {
+      "width": 1280,
+      "height": 853
     }
   },
   "export": {

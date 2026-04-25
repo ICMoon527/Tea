@@ -71,11 +71,11 @@ class Customer:
 
     def update_customer_level(self):
         """根据累计消费更新客户等级"""
-        if self.total_purchases >= 5000:
+        if self.total_purchases >= 10000:
             self.customer_level = "VIP客户"
-        elif self.total_purchases >= 2000:
+        elif self.total_purchases >= 5000:
             self.customer_level = "高级客户"
-        elif self.total_purchases >= 1000:
+        elif self.total_purchases >= 2000:
             self.customer_level = "中级客户"
         else:
             self.customer_level = "普通客户"
