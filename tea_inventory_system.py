@@ -31,20 +31,27 @@ class ShoppingCart:
             msg = 'Insufficient stock! Available: ' + str(available_stock) + ' jin'
             return {'success': False, 'message': msg}
         
+        cost_price = float(commodity['成本价']) if pd.notna(commodity['成本价']) else 0.0
+        subtotal_cost = self._calculate_subtotal(quantity, unit, cost_price)
+        
         for item in self.items:
             if item['商品编号'] == com_id:
                 item['购买数量'] = quantity
                 item['购买单位'] = unit
                 item['小计'] = self._calculate_subtotal(quantity, unit, float(commodity['零售价']))
+                item['成本价(每斤)'] = cost_price
+                item['成本小计'] = subtotal_cost
                 return {'success': True, 'message': 'Cart updated'}
         
         cart_item = {
             '商品编号': com_id,
             '商品名称': commodity['商品名称'],
             '单价(每斤)': float(commodity['零售价']),
+            '成本价(每斤)': cost_price,
             '购买数量': quantity,
             '购买单位': unit,
-            '小计': self._calculate_subtotal(quantity, unit, float(commodity['零售价']))
+            '小计': self._calculate_subtotal(quantity, unit, float(commodity['零售价'])),
+            '成本小计': subtotal_cost
         }
         
         self.items.append(cart_item)
@@ -72,6 +79,9 @@ class ShoppingCart:
     def get_total_amount(self):
         return sum(item['小计'] for item in self.items)
     
+    def get_total_cost(self):
+        return sum(item.get('成本小计', 0.0) for item in self.items)
+    
     def get_items(self):
         return self.items.copy()
     
@@ -90,9 +100,12 @@ class ShoppingCart:
                     msg = 'Insufficient stock! Available: ' + str(available_stock) + ' jin'
                     return {'success': False, 'message': msg}
                 
+                cost_price = float(commodity['成本价']) if pd.notna(commodity['成本价']) else 0.0
                 item['购买数量'] = new_quantity
                 item['购买单位'] = unit_to_use
                 item['小计'] = self._calculate_subtotal(new_quantity, unit_to_use, float(commodity['零售价']))
+                item['成本价(每斤)'] = cost_price
+                item['成本小计'] = self._calculate_subtotal(new_quantity, unit_to_use, cost_price)
                 return {'success': True, 'message': 'Quantity updated'}
         
         return {'success': False, 'message': 'Item not found in cart'}

@@ -86,6 +86,8 @@ class ExcelManager:
             return self._cache[sheet_name].copy()
         try:
             df = pd.read_excel(self.filename, sheet_name=sheet_name, engine='openpyxl')
+            # 过滤掉 Unnamed 列
+            df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
             self._cache[sheet_name] = df.copy()
             self._dirty_flags[sheet_name] = False
             return df
@@ -120,9 +122,16 @@ class ExcelManager:
                 "客户信息": ["客户编号", "客户名称", "联系电话", "电子邮箱", "地址", "累计消费", "订单数", "最后购买日期", "客户等级", "备注", "创建日期"]
             }
             
+            # 复制数据，避免修改原数据
+            data_to_write = data.copy() if not data.empty else data
+            
+            # 如果是商品信息表，确保当前库存保留两位小数
+            if sheet_name == "商品信息" and not data_to_write.empty and '当前库存' in data_to_write.columns:
+                data_to_write['当前库存'] = pd.to_numeric(data_to_write['当前库存'], errors='coerce').fillna(0).round(2)
+            
             # 如果数据有列名，使用数据的列名；否则使用默认列名
-            if not data.empty:
-                columns_to_write = data.columns.tolist()
+            if not data_to_write.empty:
+                columns_to_write = data_to_write.columns.tolist()
             elif sheet_name in expected_columns:
                 columns_to_write = expected_columns[sheet_name]
             else:
@@ -133,12 +142,12 @@ class ExcelManager:
                 ws.append(columns_to_write)
             
             # 写入数据行 - 使用批量方式写入
-            if not data.empty:
-                for _, row in data.iterrows():
+            if not data_to_write.empty:
+                for _, row in data_to_write.iterrows():
                     ws.append(row.tolist())
             
             wb.save(self.filename)
-            self._cache[sheet_name] = data.copy()
+            self._cache[sheet_name] = data_to_write.copy()
             self._dirty_flags[sheet_name] = False
         except Exception as e:
             print(f"写入工作表 {sheet_name} 出错: {e}")
@@ -220,14 +229,23 @@ class ExcelManager:
     
     # 商品相关操作
     def get_all_commodities(self):
-        return self.read_sheet("商品信息")
+        df = self.read_sheet("商品信息")
+        if not df.empty and '当前库存' in df.columns:
+            df['当前库存'] = pd.to_numeric(df['当前库存'], errors='coerce').fillna(0).round(2)
+        return df
     
     def get_commodity_by_id(self, com_id):
         df = self.read_sheet("商品信息")
         if df.empty:
             return None
         result = df[df['商品编号'] == com_id]
-        return result.iloc[0] if not result.empty else None
+        if not result.empty:
+            # 确保当前库存是两位小数
+            commodity = result.iloc[0].copy()
+            if '当前库存' in commodity:
+                commodity['当前库存'] = round(float(commodity['当前库存']), 2)
+            return commodity
+        return None
     
     def add_commodity(self, commodity_data):
         self.append_to_sheet("商品信息", commodity_data)
@@ -240,6 +258,8 @@ class ExcelManager:
         idx = df[df['商品编号'] == com_id].index
         if len(idx) > 0:
             for col, value in new_data.items():
+                if col == '当前库存':
+                    value = round(float(value), 2)
                 df.at[idx[0], col] = value
             self.write_sheet("商品信息", df)
             return True
@@ -482,7 +502,21 @@ class ExcelManager:
                         mask = df['客户名称'].notna() & (df['客户名称'] != '') & (df['客户名称'] != 'nan') & (df['客户名称'] != 'NaN')
                         df = df[mask]
                     
-                    # 4. 重置索引
+                    # 4. 自动更新所有客户等级（根据最新的门槛）
+                    if '累计消费' in df.columns and '客户等级' in df.columns:
+                        need_update = False
+                        for idx, row in df.iterrows():
+                            total_purchases = float(row['累计消费']) if pd.notna(row['累计消费']) else 0.0
+                            expected_level = self.calculate_customer_level(total_purchases)
+                            if str(row['客户等级']) != expected_level:
+                                df.at[idx, '客户等级'] = expected_level
+                                need_update = True
+                        # 如果有等级变化，保存到 Excel
+                        if need_update:
+                            self.write_sheet("客户信息", df)
+                            print(f"已自动更新 {len(df)} 位客户的等级")
+                    
+                    # 5. 重置索引
                     df = df.reset_index(drop=True)
                     print(f"清理后的数据行数: {len(df)}")
                     
@@ -538,6 +572,25 @@ class ExcelManager:
         self.write_sheet("客户信息", df)
         return True
 
+    @staticmethod
+    def calculate_customer_level(total_purchases):
+        """统一计算客户等级
+        
+        Args:
+            total_purchases: 累计消费金额
+            
+        Returns:
+            客户等级字符串
+        """
+        if total_purchases >= 10000:
+            return "VIP客户"
+        elif total_purchases >= 5000:
+            return "高级客户"
+        elif total_purchases >= 2000:
+            return "中级客户"
+        else:
+            return "普通客户"
+    
     def update_customer_after_sale(self, customer_name, amount, sale_date):
         """销售后更新客户信息"""
         df = self.read_sheet("客户信息")
@@ -561,15 +614,8 @@ class ExcelManager:
             new_purchases = current_purchases + amount
             new_orders = current_orders + 1
             
-            # 更新客户等级
-            if new_purchases >= 5000:
-                customer_level = "VIP客户"
-            elif new_purchases >= 2000:
-                customer_level = "高级客户"
-            elif new_purchases >= 1000:
-                customer_level = "中级客户"
-            else:
-                customer_level = "普通客户"
+            # 使用统一函数计算客户等级
+            customer_level = self.calculate_customer_level(new_purchases)
             
             df.at[idx, '累计消费'] = new_purchases
             df.at[idx, '订单数'] = new_orders
@@ -583,15 +629,8 @@ class ExcelManager:
         # 生成客户编号
         customer_id = self.generate_id("K", "客户信息", "客户编号")
         
-        # 确定客户等级
-        if amount >= 5000:
-            customer_level = "VIP客户"
-        elif amount >= 2000:
-            customer_level = "高级客户"
-        elif amount >= 1000:
-            customer_level = "中级客户"
-        else:
-            customer_level = "普通客户"
+        # 使用统一函数确定客户等级
+        customer_level = self.calculate_customer_level(amount)
         
         # 创建客户数据
         customer_data = [

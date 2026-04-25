@@ -64,7 +64,7 @@
     },
     "checkout": {
       "width": 800,
-      "height": 700
+      "height": 792
     },
     "add_supplier": {
       "width": 560,
@@ -101,6 +101,26 @@
     "cloud_sync_management": {
       "width": 1280,
       "height": 853
+    },
+    "dataframe_客户列表": {
+      "width": 1280,
+      "height": 700
+    },
+    "select_product": {
+      "width": 900,
+      "height": 600
+    },
+    "query_sales_by_product": {
+      "width": 700,
+      "height": 360
+    },
+    "dataframe_销售记录列表": {
+      "width": 1280,
+      "height": 811
+    },
+    "select_supplier": {
+      "width": 900,
+      "height": 600
     }
   },
   "export": {

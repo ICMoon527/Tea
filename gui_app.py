@@ -1542,7 +1542,7 @@ class TeaInventoryGUI:
 
     def view_cart_gui(self):
         """查看购物车GUI"""
-        top = self._create_toplevel_with_size("view_cart", 900, 650)
+        top = self._create_toplevel_with_size("view_cart", 1000, 650)
         top.title("购物车")
         top.configure(bg=Styles.BACKGROUND_COLOR)
         top.resizable(True, True)
@@ -1575,24 +1575,28 @@ class TeaInventoryGUI:
             frame.pack(pady=Styles.SPACING_XS, fill=tk.BOTH, expand=True, padx=Styles.SPACING_LG)
             
             tree = ttk.Treeview(frame, style="Treeview")
-            tree["columns"] = ["商品编号", "商品名称", "单价(每斤)", "数量", "单位", "小计"]
+            tree["columns"] = ["商品编号", "商品名称", "单价(每斤)", "成本价(每斤)", "数量", "单位", "成本小计", "小计"]
             tree["show"] = "headings"
             
             for col in tree["columns"]:
                 tree.heading(col, text=col)
-                tree.column(col, width=130, anchor=tk.CENTER)
+                tree.column(col, width=110, anchor=tk.CENTER)
             
             total = 0
+            total_cost = 0
             for item in self.system.shopping_cart.get_items():
                 tree.insert("", tk.END, values=[
                     item['商品编号'],
                     item['商品名称'],
-                    item['单价(每斤)'],
+                    f"{item['单价(每斤)']:.2f}",
+                    f"{item.get('成本价(每斤)', 0.0):.2f}",
                     item['购买数量'],
                     item['购买单位'],
-                    item['小计']
+                    f"{item.get('成本小计', 0.0):.2f}",
+                    f"{item['小计']:.2f}"
                 ])
                 total += item['小计']
+                total_cost += item.get('成本小计', 0.0)
             
             scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=tree.yview)
             tree.configure(yscrollcommand=scrollbar.set)
@@ -1600,7 +1604,12 @@ class TeaInventoryGUI:
             tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
             scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
             
-            tk.Label(top, text=f"总计: {total:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.SPACING_SM)
+            # 显示总计信息
+            info_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+            info_frame.pack(pady=Styles.SPACING_SM)
+            
+            tk.Label(info_frame, text=f"总成本: {total_cost:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
+            tk.Label(info_frame, text=f"总计: {total:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.SPACING_XS)
             
             # 双击修改商品数量
             def double_click_modify(event):
@@ -1688,7 +1697,7 @@ class TeaInventoryGUI:
             messagebox.showerror("错误", "购物车为空，无法结账")
             return
         
-        top = self._create_toplevel_with_size("checkout", 800, 700)
+        top = self._create_toplevel_with_size("checkout", 900, 700)
         top.title("结账")
         top.configure(bg=Styles.BACKGROUND_COLOR)
         top.resizable(True, True)
@@ -1708,24 +1717,27 @@ class TeaInventoryGUI:
         # 显示购物车内容
         cart_items = self.system.shopping_cart.get_items()
         total_amount = sum(item['小计'] for item in cart_items)
+        total_cost = sum(item.get('成本小计', 0.0) for item in cart_items)
+        expected_profit = total_amount - total_cost
         
         frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         frame.pack(pady=Styles.SPACING_XS, fill=tk.BOTH, expand=True, padx=Styles.SPACING_LG)
         
         tree = ttk.Treeview(frame, style="Treeview")
-        tree["columns"] = ["商品名称", "数量", "单位", "小计"]
+        tree["columns"] = ["商品名称", "数量", "单位", "成本小计", "小计"]
         tree["show"] = "headings"
         
         for col in tree["columns"]:
             tree.heading(col, text=col)
-            tree.column(col, width=140, anchor=tk.CENTER)
+            tree.column(col, width=130, anchor=tk.CENTER)
         
         for item in cart_items:
             tree.insert("", tk.END, values=[
                 item['商品名称'],
                 item['购买数量'],
                 item['购买单位'],
-                item['小计']
+                f"{item.get('成本小计', 0.0):.2f}",
+                f"{item['小计']:.2f}"
             ])
         
         scrollbar = ttk.Scrollbar(frame, orient=tk.VERTICAL, command=tree.yview)
@@ -1734,15 +1746,29 @@ class TeaInventoryGUI:
         tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
         
-        tk.Label(top, text=f"应付总额: {total_amount:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.SPACING_SM)
+        # 显示成本信息
+        info_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+        info_frame.pack(pady=Styles.SPACING_SM)
+        
+        tk.Label(info_frame, text=f"总成本: {total_cost:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
+        tk.Label(info_frame, text=f"预期利润: {expected_profit:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.SUCCESS_COLOR).pack(pady=Styles.SPACING_XS)
+        tk.Label(info_frame, text=f"应付总额: {total_amount:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.HEADER_COLOR).pack(pady=Styles.SPACING_XS)
         
         input_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         input_frame.pack(pady=Styles.SPACING_SM)
         
         # 客户名称
         tk.Label(input_frame, text="客户名称: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
+        customer_frame = tk.Frame(input_frame, bg=Styles.BACKGROUND_COLOR)
+        customer_frame.pack(pady=Styles.SPACING_XS)
         customer_var = tk.StringVar()
-        tk.Entry(input_frame, textvariable=customer_var, width=30, font=Styles.TEXT_FONT).pack(pady=Styles.SPACING_XS)
+        tk.Entry(customer_frame, textvariable=customer_var, width=30, font=Styles.TEXT_FONT).pack(side=tk.LEFT, padx=(0, 5))
+        btn_select_customer = tk.Button(customer_frame, text="选择...", font=Styles.TEXT_FONT,
+                                      width=8, command=lambda: self._select_customer_dialog(customer_var),
+                                      bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=2)
+        btn_select_customer.pack(side=tk.LEFT)
+        btn_select_customer.bind("<Enter>", lambda e, b=btn_select_customer: b.config(bg=Styles.BUTTON_HOVER_COLOR))
+        btn_select_customer.bind("<Leave>", lambda e, b=btn_select_customer: b.config(bg=Styles.PRIMARY_COLOR))
         
         # 实收金额
         tk.Label(input_frame, text="实收金额: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
@@ -2696,6 +2722,40 @@ class TeaInventoryGUI:
 
     def view_all_customers(self):
         df = self.system.excel_manager.get_all_customers()
+        if not df.empty:
+            try:
+                # 获取销售数据和商品成本价
+                sales_df = self.system.excel_manager.get_all_sales()
+                commodity_df = self.system.excel_manager.get_all_commodities()
+                
+                if not sales_df.empty and not commodity_df.empty:
+                    # 合并销售数据和成本价
+                    merged_sales = pd.merge(sales_df, commodity_df[["商品编号", "成本价"]], 
+                                          on="商品编号", how="left")
+                    
+                    # 计算每笔销售的利润
+                    unit_is_gram = merged_sales.get('销售单位', '斤') == '克'
+                    merged_sales['销售数量(斤)'] = merged_sales['销售数量']
+                    merged_sales.loc[unit_is_gram, '销售数量(斤)'] = merged_sales.loc[unit_is_gram, '销售数量'] / 500
+                    merged_sales['销售成本'] = merged_sales['销售数量(斤)'] * merged_sales['成本价']
+                    merged_sales['利润'] = merged_sales['实收金额'] - merged_sales['销售成本']
+                    
+                    # 按客户分组计算累计利润
+                    customer_profit = merged_sales.groupby('客户名称')['利润'].sum().reset_index()
+                    customer_profit.columns = ['客户名称', '累计利润']
+                    
+                    # 合并到客户数据中
+                    df = pd.merge(df, customer_profit, on='客户名称', how='left')
+                    df['累计利润'] = df['累计利润'].fillna(0).round(2)
+                    
+                    # 调整列的顺序，将累计利润放在累计消费后面
+                    cols = list(df.columns)
+                    if '累计消费' in cols and '累计利润' in cols:
+                        pos = cols.index('累计消费')
+                        cols.insert(pos + 1, cols.pop(cols.index('累计利润')))
+                        df = df[cols]
+            except Exception as e:
+                print(f"计算客户累计利润时出错: {e}")
         self.show_dataframe_window(df, "客户列表")
 
     def add_customer_gui(self):
@@ -3041,6 +3101,40 @@ class TeaInventoryGUI:
 
     def view_all_customers(self):
         df = self.system.excel_manager.get_all_customers()
+        if not df.empty:
+            try:
+                # 获取销售数据和商品成本价
+                sales_df = self.system.excel_manager.get_all_sales()
+                commodity_df = self.system.excel_manager.get_all_commodities()
+                
+                if not sales_df.empty and not commodity_df.empty:
+                    # 合并销售数据和成本价
+                    merged_sales = pd.merge(sales_df, commodity_df[["商品编号", "成本价"]], 
+                                          on="商品编号", how="left")
+                    
+                    # 计算每笔销售的利润
+                    unit_is_gram = merged_sales.get('销售单位', '斤') == '克'
+                    merged_sales['销售数量(斤)'] = merged_sales['销售数量']
+                    merged_sales.loc[unit_is_gram, '销售数量(斤)'] = merged_sales.loc[unit_is_gram, '销售数量'] / 500
+                    merged_sales['销售成本'] = merged_sales['销售数量(斤)'] * merged_sales['成本价']
+                    merged_sales['利润'] = merged_sales['实收金额'] - merged_sales['销售成本']
+                    
+                    # 按客户分组计算累计利润
+                    customer_profit = merged_sales.groupby('客户名称')['利润'].sum().reset_index()
+                    customer_profit.columns = ['客户名称', '累计利润']
+                    
+                    # 合并到客户数据中
+                    df = pd.merge(df, customer_profit, on='客户名称', how='left')
+                    df['累计利润'] = df['累计利润'].fillna(0).round(2)
+                    
+                    # 调整列的顺序，将累计利润放在累计消费后面
+                    cols = list(df.columns)
+                    if '累计消费' in cols and '累计利润' in cols:
+                        pos = cols.index('累计消费')
+                        cols.insert(pos + 1, cols.pop(cols.index('累计利润')))
+                        df = df[cols]
+            except Exception as e:
+                print(f"计算客户累计利润时出错: {e}")
         self.show_dataframe_window(df, "客户列表")
 
     def sales_record_management(self):
@@ -3835,6 +3929,17 @@ class TeaInventoryGUI:
                     df.at[idx, '销售数量'] = row['销售数量'] / 500
                     df.at[idx, '销售单位'] = '斤'
         
+        # 实收金额保留一位小数
+        if '实收金额' in df.columns:
+            df = df.copy()
+            for idx, row in df.iterrows():
+                val = row['实收金额']
+                if pd.notna(val):
+                    try:
+                        df.at[idx, '实收金额'] = round(float(val), 1)
+                    except:
+                        pass
+        
         # 创建表格区域
         table_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         table_frame.pack(padx=Styles.PADX_MEDIUM, pady=Styles.PADY_SMALL, fill=tk.BOTH, expand=True)
@@ -3944,6 +4049,13 @@ class TeaInventoryGUI:
                     val = row[col]
                     if pd.isna(val):
                         values.append("")
+                    elif col == "实收金额":
+                        # 实收金额保留一位小数
+                        try:
+                            num_val = float(val)
+                            values.append(f"{num_val:.1f}")
+                        except:
+                            values.append(str(val))
                     else:
                         values.append(str(val))
                 tree.insert("", tk.END, values=values)
