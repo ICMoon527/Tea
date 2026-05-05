@@ -99,7 +99,7 @@
       "height": 700
     },
     "cloud_sync_management": {
-      "width": 1280,
+      "width": 1279,
       "height": 853
     },
     "dataframe_客户列表": {
@@ -121,6 +121,10 @@
     "select_supplier": {
       "width": 900,
       "height": 600
+    },
+    "query_sales_by_customer": {
+      "width": 700,
+      "height": 360
     }
   },
   "export": {

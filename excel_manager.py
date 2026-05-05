@@ -13,6 +13,7 @@ class ExcelManager:
         self._cache = {}
         self._dirty_flags = {}
         self.init_excel_file()
+        self.clear_cache()
 
     def init_excel_file(self):
         """初始化Excel文件，创建必要的工作表并检查结构"""
@@ -88,6 +89,23 @@ class ExcelManager:
             df = pd.read_excel(self.filename, sheet_name=sheet_name, engine='openpyxl')
             # 过滤掉 Unnamed 列
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+            
+            # 针对特定工作表进行数据类型处理
+            if sheet_name == "客户信息" and not df.empty:
+                # 确保累计消费列是浮点类型
+                if '累计消费' in df.columns:
+                    df['累计消费'] = pd.to_numeric(df['累计消费'], errors='coerce').fillna(0.0)
+            elif sheet_name == "供应商" and not df.empty:
+                # 确保累计交易金额列是浮点类型
+                if '累计交易金额' in df.columns:
+                    df['累计交易金额'] = pd.to_numeric(df['累计交易金额'], errors='coerce').fillna(0.0)
+            elif sheet_name == "商品信息" and not df.empty:
+                # 确保数值列是浮点类型
+                numeric_columns = ['成本价', '零售价', '当前库存']
+                for col in numeric_columns:
+                    if col in df.columns:
+                        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            
             self._cache[sheet_name] = df.copy()
             self._dirty_flags[sheet_name] = False
             return df
@@ -258,9 +276,16 @@ class ExcelManager:
         idx = df[df['商品编号'] == com_id].index
         if len(idx) > 0:
             for col, value in new_data.items():
-                if col == '当前库存':
-                    value = round(float(value), 2)
-                df.at[idx[0], col] = value
+                if col in ['当前库存', '成本价', '零售价']:
+                    # 对于数值列，完全重新创建列来确保数据类型正确
+                    col_list = df[col].tolist()
+                    if col == '当前库存':
+                        col_list[idx[0]] = round(float(value), 2)
+                    else:
+                        col_list[idx[0]] = float(value)
+                    df[col] = pd.Series(col_list, dtype=float)
+                else:
+                    df.at[idx[0], col] = value
             self.write_sheet("商品信息", df)
             return True
         return False
@@ -450,10 +475,16 @@ class ExcelManager:
             # 获取当前累计交易金额，如果为空则为0
             current_amount = float(df.at[idx, '累计交易金额']) if pd.notna(df.at[idx, '累计交易金额']) else 0.0
             # 更新累计交易金额
-            df.at[idx, '累计交易金额'] = current_amount + amount
+            new_amount = current_amount + amount
+            
+            # 完全重新创建列来确保数据类型正确
+            amount_list = df['累计交易金额'].tolist()
+            amount_list[idx] = float(new_amount)
+            df['累计交易金额'] = pd.Series(amount_list, dtype=float)
+            
             # 保存更新
             self.write_sheet("供应商", df)
-            print(f"供应商 {supplier_name} 已更新，累计交易金额: {current_amount + amount}")
+            print(f"供应商 {supplier_name} 已更新，累计交易金额: {new_amount}")
 
     def _create_new_supplier(self, supplier_name, amount, stock_date):
         """创建新供应商"""
@@ -491,18 +522,22 @@ class ExcelManager:
                 print(f"\n移除全 NaN 行后，行数: {len(df)}")
                 
                 if not df.empty:
-                    # 2. 只对文本列进行字符串转换和去空白
+                    # 2. 确保累计消费列是浮点类型
+                    if '累计消费' in df.columns:
+                        df['累计消费'] = pd.to_numeric(df['累计消费'], errors='coerce').fillna(0.0)
+                    
+                    # 3. 只对文本列进行字符串转换和去空白
                     text_columns = ['客户编号', '客户名称', '联系人', '联系电话', '地址', '客户等级', '最后购买日期']
                     for col in text_columns:
                         if col in df.columns:
                             df[col] = df[col].astype(str).str.strip()
                     
-                    # 3. 移除空行（检查关键文本字段）
+                    # 4. 移除空行（检查关键文本字段）
                     if '客户名称' in df.columns:
                         mask = df['客户名称'].notna() & (df['客户名称'] != '') & (df['客户名称'] != 'nan') & (df['客户名称'] != 'NaN')
                         df = df[mask]
                     
-                    # 4. 自动更新所有客户等级（根据最新的门槛）
+                    # 5. 自动更新所有客户等级（根据最新的门槛）
                     if '累计消费' in df.columns and '客户等级' in df.columns:
                         need_update = False
                         for idx, row in df.iterrows():
@@ -617,8 +652,15 @@ class ExcelManager:
             # 使用统一函数计算客户等级
             customer_level = self.calculate_customer_level(new_purchases)
             
-            df.at[idx, '累计消费'] = new_purchases
-            df.at[idx, '订单数'] = new_orders
+            # 完全重新创建列来确保数据类型正确
+            purchases_list = df['累计消费'].tolist()
+            purchases_list[idx] = float(new_purchases)
+            df['累计消费'] = pd.Series(purchases_list, dtype=float)
+            
+            orders_list = df['订单数'].tolist()
+            orders_list[idx] = int(new_orders)
+            df['订单数'] = pd.Series(orders_list, dtype=int)
+            
             df.at[idx, '最后购买日期'] = sale_date
             df.at[idx, '客户等级'] = customer_level
             
