@@ -90,7 +90,7 @@ class AlertManager:
                             '预警级别': alert_level,
                             '当前库存': row['当前库存']
                         })
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
                 continue
         
         result_df = pd.DataFrame(expiry_alerts)

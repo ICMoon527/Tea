@@ -19,7 +19,7 @@ class ShoppingCart:
         self.excel_manager = excel_manager
         self.items = []
     
-    def add_item(self, com_id, quantity, unit):
+    def add_item(self, com_id: str, quantity: float, unit: str) -> dict:
         commodity = self.excel_manager.get_commodity_by_id(com_id)
         if commodity is None:
             return {'success': False, 'message': 'Product not found'}
@@ -57,13 +57,13 @@ class ShoppingCart:
         self.items.append(cart_item)
         return {'success': True, 'message': 'Added to cart'}
     
-    def _calculate_subtotal(self, quantity, unit, unit_price):
+    def _calculate_subtotal(self, quantity: float, unit: str, unit_price: float) -> float:
         if unit == '斤':
             return quantity * unit_price
         else:
             return (quantity / 500) * unit_price
     
-    def remove_item(self, com_id):
+    def remove_item(self, com_id: str) -> bool:
         for i, item in enumerate(self.items):
             if item['商品编号'] == com_id:
                 self.items.pop(i)
@@ -76,13 +76,13 @@ class ShoppingCart:
     def is_empty(self):
         return len(self.items) == 0
     
-    def get_total_amount(self):
+    def get_total_amount(self) -> float:
         return sum(item['小计'] for item in self.items)
     
-    def get_total_cost(self):
+    def get_total_cost(self) -> float:
         return sum(item.get('成本小计', 0.0) for item in self.items)
     
-    def get_items(self):
+    def get_items(self) -> list:
         return self.items.copy()
     
     def update_item_quantity(self, com_id, new_quantity, new_unit=None):
@@ -338,7 +338,7 @@ class TeaInventorySystem:
         
         if updates:
             success = self.excel_manager.update_commodity(com_id, updates)
-            if success:
+            if success.get('success'):
                 print("商品信息更新成功！")
             else:
                 print("更新失败！")
@@ -357,7 +357,7 @@ class TeaInventorySystem:
         confirm = input(f"确定要删除商品 '{commodity['商品名称']}' 吗？(y/N): ").strip().lower()
         if confirm == 'y':
             success = self.excel_manager.delete_commodity(com_id)
-            if success:
+            if success.get('success'):
                 print("商品删除成功！")
             else:
                 print("删除失败！")

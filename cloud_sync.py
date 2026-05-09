@@ -51,8 +51,7 @@ class CloudSyncManager:
                     config = default_config.copy()
                     self._deep_update(config, loaded_config)
                     return config
-            except Exception as e:
-                print(f"加载同步配置失败: {e}")
+            except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
                 return default_config
         
         return default_config
@@ -71,7 +70,7 @@ class CloudSyncManager:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
             return True
-        except Exception as e:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             print(f"保存同步配置失败: {e}")
             return False
     
@@ -89,7 +88,7 @@ class CloudSyncManager:
                 for byte_block in iter(lambda: f.read(4096), b""):
                     sha256_hash.update(byte_block)
             return sha256_hash.hexdigest()
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             print(f"计算文件哈希失败: {e}")
             return ""
     

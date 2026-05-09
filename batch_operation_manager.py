@@ -77,7 +77,7 @@ class BatchOperationManager:
                         details=f"批量更新商品价格: {com_id}",
                         data=str(updates)
                     )
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
                 results['failed'] += 1
                 results['details'].append({
                     'id': com_id,
@@ -130,7 +130,7 @@ class BatchOperationManager:
                     module="商品管理",
                     details=f"批量删除商品: {com_id}"
                 )
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
                 results['failed'] += 1
                 results['details'].append({
                     'id': com_id,
@@ -193,7 +193,7 @@ class BatchOperationManager:
                     details=f"批量更新供应商: {sup_id}",
                     data=str(updates)
                 )
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
                 results['failed'] += 1
                 results['details'].append({
                     'id': sup_id,
@@ -249,7 +249,7 @@ class BatchOperationManager:
                     details=f"批量更新客户: {cus_id}",
                     data=str(updates)
                 )
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
                 results['failed'] += 1
                 results['details'].append({
                     'id': cus_id,
@@ -286,7 +286,7 @@ class BatchOperationManager:
                     'status': 'success',
                     'message': '导入成功'
                 })
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
                 results['failed'] += 1
                 results['details'].append({
                     'index': idx,
@@ -362,7 +362,7 @@ class BatchOperationManager:
                     'status': 'success',
                     'message': f'库存调整成功: {commodity["当前库存"]} -> {new_stock}'
                 })
-            except Exception as e:
+            except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
                 results['failed'] += 1
                 results['details'].append({
                     'id': adjustment.get('商品编号', 'unknown'),

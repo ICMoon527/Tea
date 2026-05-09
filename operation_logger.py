@@ -2,13 +2,16 @@ import os
 from datetime import datetime
 from typing import List, Optional, Dict
 import pandas as pd
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class OperationLogger:
     """操作日志记录器"""
-    
+
     LOG_FILE = "operation_logs.xlsx"
-    
+
     LOG_COLUMNS = [
         "日志编号",
         "操作时间",
@@ -18,7 +21,7 @@ class OperationLogger:
         "操作数据",
         "操作人"
     ]
-    
+
     OPERATION_TYPES = [
         "新增",
         "修改",
@@ -30,10 +33,30 @@ class OperationLogger:
         "恢复",
         "其他"
     ]
-    
-    def __init__(self, log_file: str = None):
+
+    LOG_LEVELS = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+
+    def __init__(self, log_file: str = None, log_level: str = "INFO"):
         self.log_file = log_file or self.LOG_FILE
+        self.log_level = self.LOG_LEVELS.get(log_level.upper(), logging.INFO)
         self._init_log_file()
+
+    def set_log_level(self, level: str):
+        """设置日志级别
+
+        Args:
+            level: 日志级别 (DEBUG/INFO/WARNING/ERROR/CRITICAL)
+        """
+        if level.upper() in self.LOG_LEVELS:
+            self.log_level = self.LOG_LEVELS[level.upper()]
+        else:
+            logger.warning(f"未知的日志级别: {level}，保持当前级别")
     
     def _init_log_file(self) -> None:
         """初始化日志文件"""
@@ -83,7 +106,7 @@ class OperationLogger:
             df = pd.concat([df, new_row], ignore_index=True)
             df.to_excel(self.log_file, index=False, engine='openpyxl')
         except Exception as e:
-            print(f"记录日志失败: {e}")
+            logger.error(f"记录日志失败: {e}")
         
         return log_id
     
@@ -139,9 +162,9 @@ class OperationLogger:
             
             return df
         except Exception as e:
-            print(f"查询日志失败: {e}")
+            logger.error(f"查询日志失败: {e}")
             return pd.DataFrame(columns=self.LOG_COLUMNS)
-    
+
     def get_all_logs(self) -> pd.DataFrame:
         """获取所有操作日志
         
@@ -153,7 +176,7 @@ class OperationLogger:
             df = df.sort_values('操作时间', ascending=False)
             return df
         except Exception as e:
-            print(f"获取日志失败: {e}")
+            logger.error(f"获取日志失败: {e}")
             return pd.DataFrame(columns=self.LOG_COLUMNS)
     
     def get_recent_logs(self, count: int = 50) -> pd.DataFrame:
@@ -188,7 +211,7 @@ class OperationLogger:
                 return sorted(df['操作模块'].unique().tolist())
             return []
         except Exception as e:
-            print(f"获取模块列表失败: {e}")
+            logger.error(f"获取模块列表失败: {e}")
             return []
     
     def clear_old_logs(self, days_to_keep: int = 30) -> int:
@@ -218,7 +241,7 @@ class OperationLogger:
             
             return deleted_count
         except Exception as e:
-            print(f"清理旧日志失败: {e}")
+            logger.error(f"清理旧日志失败: {e}")
             return 0
     
     def export_logs(self, export_path: str, logs_df: Optional[pd.DataFrame] = None) -> bool:
@@ -238,5 +261,5 @@ class OperationLogger:
             logs_df.to_excel(export_path, index=False, engine='openpyxl')
             return True
         except Exception as e:
-            print(f"导出日志失败: {e}")
+            logger.error(f"导出日志失败: {e}")
             return False

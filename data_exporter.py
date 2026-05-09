@@ -42,7 +42,7 @@ class DataExporter:
                     df = df[df['品种'] == filters['品种']]
             
             return self._export_dataframe(df, export_path, format)
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"导出商品数据失败: {e}")
             return False
     
@@ -74,7 +74,7 @@ class DataExporter:
                     df = df[df['销售日期'] <= end_date]
             
             return self._export_dataframe(df, export_path, format)
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"导出销售数据失败: {e}")
             return False
     
@@ -106,7 +106,7 @@ class DataExporter:
                     df = df[df['进货日期'] <= end_date]
             
             return self._export_dataframe(df, export_path, format)
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"导出进货数据失败: {e}")
             return False
     
@@ -127,7 +127,7 @@ class DataExporter:
         try:
             df = self.excel_manager.get_all_suppliers()
             return self._export_dataframe(df, export_path, format)
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"导出供应商数据失败: {e}")
             return False
     
@@ -148,7 +148,7 @@ class DataExporter:
         try:
             df = self.excel_manager.get_all_customers()
             return self._export_dataframe(df, export_path, format)
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"导出客户数据失败: {e}")
             return False
     
@@ -170,7 +170,7 @@ class DataExporter:
         """
         try:
             return self._export_dataframe(statistics_data, export_path, format)
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"导出统计数据失败: {e}")
             return False
     
@@ -250,7 +250,7 @@ class DataExporter:
                 raise ValueError(f"不支持的导出格式: {format}")
             
             return True
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"导出数据失败: {e}")
             return False
     

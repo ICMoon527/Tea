@@ -1,5 +1,6 @@
 import json
 import os
+import copy
 from typing import Dict, Any, Optional
 from datetime import datetime
 
@@ -48,7 +49,7 @@ class ConfigManager:
             配置字典
         """
         if not os.path.exists(self.config_file):
-            config = self.DEFAULT_CONFIG.copy()
+            config = copy.deepcopy(self.DEFAULT_CONFIG)
             self._save_config(config)
             return config
         
@@ -56,11 +57,11 @@ class ConfigManager:
             with open(self.config_file, 'r', encoding='utf-8') as f:
                 config = json.load(f)
             
-            config = self._merge_config(self.DEFAULT_CONFIG, config)
+            config = self._merge_config(copy.deepcopy(self.DEFAULT_CONFIG), config)
             return config
-        except Exception as e:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             print(f"加载配置文件失败: {e}")
-            return self.DEFAULT_CONFIG.copy()
+            return copy.deepcopy(self.DEFAULT_CONFIG)
     
     def _merge_config(self, default: Dict, user: Dict) -> Dict:
         """合并默认配置和用户配置
@@ -98,7 +99,7 @@ class ConfigManager:
             with open(self.config_file, 'w', encoding='utf-8') as f:
                 json.dump(config, f, ensure_ascii=False, indent=2)
             return True
-        except Exception as e:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             print(f"保存配置文件失败: {e}")
             return False
     
@@ -143,7 +144,7 @@ class ConfigManager:
             
             config[keys[-1]] = value
             return self._save_config()
-        except Exception as e:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             print(f"设置配置失败: {e}")
             return False
     
@@ -184,7 +185,7 @@ class ConfigManager:
             import shutil
             shutil.copy2(self.config_file, backup_file)
             return backup_file
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             print(f"备份配置文件失败: {e}")
             return ""
     
@@ -268,7 +269,7 @@ class ConfigManager:
                 'height': height
             }
             return self._save_config()
-        except Exception as e:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             print(f"保存窗口大小失败: {e}")
             return False
     
@@ -288,7 +289,7 @@ class ConfigManager:
             if window_id in window_sizes:
                 size = window_sizes[window_id]
                 return (size.get('width', default_width), size.get('height', default_height))
-        except Exception as e:
+        except (KeyError, TypeError, json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             print(f"加载窗口大小失败: {e}")
         
         return (default_width, default_height)
@@ -302,6 +303,6 @@ class ConfigManager:
         try:
             self.config['window_sizes'] = {}
             return self._save_config()
-        except Exception as e:
+        except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
             print(f"重置窗口大小失败: {e}")
             return False

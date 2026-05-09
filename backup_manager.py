@@ -50,7 +50,7 @@ class BackupManager:
             for file_info in files_to_delete:
                 try:
                     os.remove(file_info['path'])
-                except Exception as e:
+                except (FileNotFoundError, PermissionError, OSError) as e:
                     print(f"删除旧备份文件失败: {e}")
     
     def list_backups(self) -> List[dict]:
@@ -100,7 +100,7 @@ class BackupManager:
             
             shutil.copy2(backup_path, self.data_file)
             return True
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             print(f"恢复备份失败: {e}")
             return False
     
@@ -118,7 +118,7 @@ class BackupManager:
                 os.remove(backup_path)
                 return True
             return False
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             print(f"删除备份失败: {e}")
             return False
     
@@ -144,7 +144,7 @@ class BackupManager:
                 'created_time': datetime.fromtimestamp(file_stat.st_mtime),
                 'modified_time': datetime.fromtimestamp(file_stat.st_mtime)
             }
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, OSError) as e:
             print(f"获取备份信息失败: {e}")
             return None
     

@@ -78,10 +78,10 @@ class ExcelManager:
                             # 重写供应商表
                             self.write_sheet("供应商", df)
                 wb.close()
-            except Exception as e:
+            except (PermissionError, OSError) as e:
                 print(f"检查Excel文件结构时出错: {e}")
     
-    def read_sheet(self, sheet_name):
+    def read_sheet(self, sheet_name: str):
         """读取指定工作表的数据（带缓存）"""
         if sheet_name in self._cache:
             return self._cache[sheet_name].copy()
@@ -109,16 +109,16 @@ class ExcelManager:
             self._cache[sheet_name] = df.copy()
             self._dirty_flags[sheet_name] = False
             return df
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, OSError) as e:
             print(f"读取工作表 {sheet_name} 出错: {e}")
             return pd.DataFrame()
     
-    def clear_cache(self):
+    def clear_cache(self, sheet_name: str = None):
         """清空所有缓存数据"""
         self._cache.clear()
         self._dirty_flags.clear()
     
-    def write_sheet(self, sheet_name, data):
+    def write_sheet(self, sheet_name: str, data):
         """写入数据到指定工作表（更新缓存）"""
         try:
             wb = load_workbook(self.filename)
@@ -167,7 +167,7 @@ class ExcelManager:
             wb.save(self.filename)
             self._cache[sheet_name] = data_to_write.copy()
             self._dirty_flags[sheet_name] = False
-        except Exception as e:
+        except (PermissionError, OSError) as e:
             print(f"写入工作表 {sheet_name} 出错: {e}")
     
     def append_to_sheet(self, sheet_name, data_row):
@@ -189,10 +189,10 @@ class ExcelManager:
             if sheet_name in self._cache:
                 del self._cache[sheet_name]
                 del self._dirty_flags[sheet_name]
-        except Exception as e:
+        except (PermissionError, OSError) as e:
             print(f"追加数据到工作表 {sheet_name} 出错: {e}")
     
-    def generate_id(self, prefix, sheet_name=None, id_column=None):
+    def generate_id(self, prefix: str, sheet_name: str = None, id_column: str = None):
         """生成唯一ID"""
         # 如果是商品编号（前缀为"C"），则使用递增编号
         if prefix == "C" and sheet_name == "商品信息" and id_column == "商品编号":
@@ -265,19 +265,48 @@ class ExcelManager:
             return commodity
         return None
     
+    def add_record(self, sheet_name: str, data):
+        """通用添加记录方法"""
+        self.append_to_sheet(sheet_name, data)
+        return {'success': True}
+
+    def update_record(self, sheet_name: str, record_id, updates, id_column: str):
+        """通用更新记录方法"""
+        df = self.read_sheet(sheet_name)
+        if df.empty:
+            return {'success': False, 'message': '表为空'}
+        df[id_column] = df[id_column].astype(str)
+        idx = df[df[id_column] == str(record_id)].index
+        if len(idx) == 0:
+            return {'success': False, 'message': '记录不存在'}
+        for col, value in updates.items():
+            df.at[idx[0], col] = value
+        self.write_sheet(sheet_name, df)
+        return {'success': True}
+
+    def delete_record(self, sheet_name: str, record_id, id_column: str):
+        """通用删除记录方法"""
+        df = self.read_sheet(sheet_name)
+        if df.empty:
+            return {'success': False, 'message': '表为空'}
+        df[id_column] = df[id_column].astype(str)
+        df = df[df[id_column] != str(record_id)]
+        self.write_sheet(sheet_name, df)
+        return {'success': True}
+
     def add_commodity(self, commodity_data):
         self.append_to_sheet("商品信息", commodity_data)
+        return {'success': True}
     
     def update_commodity(self, com_id, new_data):
         df = self.read_sheet("商品信息")
         if df.empty:
-            return False
-        
+            return {'success': False, 'message': '商品表为空'}
+
         idx = df[df['商品编号'] == com_id].index
         if len(idx) > 0:
             for col, value in new_data.items():
                 if col in ['当前库存', '成本价', '零售价']:
-                    # 对于数值列，完全重新创建列来确保数据类型正确
                     col_list = df[col].tolist()
                     if col == '当前库存':
                         col_list[idx[0]] = round(float(value), 2)
@@ -287,17 +316,17 @@ class ExcelManager:
                 else:
                     df.at[idx[0], col] = value
             self.write_sheet("商品信息", df)
-            return True
-        return False
+            return {'success': True}
+        return {'success': False, 'message': '商品不存在'}
     
     def delete_commodity(self, com_id):
         df = self.read_sheet("商品信息")
         if df.empty:
-            return False
-        
+            return {'success': False, 'message': '商品表为空'}
+
         df = df[df['商品编号'] != com_id]
         self.write_sheet("商品信息", df)
-        return True
+        return {'success': True}
     
     # 销售相关操作
     def get_all_sales(self, include_voided=False):
@@ -442,7 +471,7 @@ class ExcelManager:
             
             print("=== 读取供应商数据完成 ===")
             return df
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"获取供应商数据时出错: {e}")
             import traceback
             traceback.print_exc()
@@ -562,7 +591,7 @@ class ExcelManager:
             
             print("=== 读取客户数据完成 ===")
             return df
-        except Exception as e:
+        except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
             print(f"获取客户数据时出错: {e}")
             import traceback
             traceback.print_exc()
@@ -584,6 +613,7 @@ class ExcelManager:
 
     def add_customer(self, customer_data):
         self.append_to_sheet("客户信息", customer_data)
+        return {'success': True}
 
     def update_customer(self, customer_id, new_data):
         df = self.read_sheet("客户信息")

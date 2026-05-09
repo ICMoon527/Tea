@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 
-def convert_units(amount, from_unit, to_unit):
+def convert_units(amount: float, from_unit: str, to_unit: str) -> float:
     """单位转换：斤与克之间的转换"""
     if from_unit == to_unit:
         return amount
@@ -14,17 +14,17 @@ def convert_units(amount, from_unit, to_unit):
         raise ValueError(f"不支持的单位转换: {from_unit} -&gt; {to_unit}")
 
 
-def convert_to_jin(quantity, unit):
+def convert_to_jin(quantity: float, unit: str) -> float:
     """将任意单位转换为斤"""
     return convert_units(quantity, unit, "斤")
 
 
-def convert_to_ke(quantity, unit):
+def convert_to_ke(quantity: float, unit: str) -> float:
     """将任意单位转换为克"""
     return convert_units(quantity, unit, "克")
 
 
-def calculate_cost(quantity, unit, cost_price_per_jin):
+def calculate_cost(quantity: float, unit: str, cost_price_per_jin: float) -> float:
     """计算成本
 
     Args:
@@ -39,7 +39,7 @@ def calculate_cost(quantity, unit, cost_price_per_jin):
     return quantity_in_jin * cost_price_per_jin
 
 
-def is_expired(production_date, shelf_life_months):
+def is_expired(production_date: str, shelf_life_months: int) -> bool:
     """判断是否过期
 
     Args:
@@ -52,12 +52,12 @@ def is_expired(production_date, shelf_life_months):
     try:
         prod_date = datetime.strptime(production_date, "%Y-%m-%d")
         expire_date = prod_date + timedelta(days=shelf_life_months * 30)
-        return datetime.now() &gt; expire_date
-    except:
+        return datetime.now() > expire_date
+    except (ValueError, TypeError):
         return False
 
 
-def days_until_expire(production_date, shelf_life_months):
+def days_until_expire(production_date: str, shelf_life_months: int) -> int:
     """计算距离过期还有多少天
 
     Args:
@@ -72,25 +72,25 @@ def days_until_expire(production_date, shelf_life_months):
         expire_date = prod_date + timedelta(days=shelf_life_months * 30)
         delta = expire_date - datetime.now()
         return delta.days
-    except:
+    except (ValueError, TypeError):
         return -999
 
 
-def format_date(date_str):
+def format_date(date_str: str) -> str:
     """格式化日期字符串"""
     try:
         dt = datetime.strptime(date_str, "%Y-%m-%d")
         return dt.strftime("%Y-%m-%d")
-    except:
+    except (ValueError, TypeError):
         return date_str
 
 
-def format_currency(amount):
+def format_currency(amount: float) -> str:
     """格式化货币显示"""
     return f"{amount:.2f}"
 
 
-def format_number(number, decimals=2):
+def format_number(number: float, decimals: int = 2) -> str:
     """格式化数字显示"""
     return f"{number:.{decimals}f}"
 
