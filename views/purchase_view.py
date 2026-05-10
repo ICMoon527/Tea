@@ -166,10 +166,6 @@ class PurchaseViewMixin:
                 
                 self.system.excel_manager.add_stock(stock_record.to_list())
                 
-                # 更新供应商信息
-                if supplier:
-                    self.system.excel_manager.update_supplier_after_stock(supplier, quantity * unit_price, stock_date)
-                
                 messagebox.showinfo("成功", f"进货入库成功！\n进货编号: {stock_id}")
                 top.destroy()
             except ValueError as e:
