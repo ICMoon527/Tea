@@ -2,17 +2,23 @@ import pandas as pd
 from openpyxl import Workbook, load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import os
+import shutil
 from datetime import datetime
 import random
 from utils import convert_to_jin
+from logger import get_logger
 
 
 class ExcelManager:
     def __init__(self, filename="tea_inventory.xlsx"):
+        self.logger = get_logger()
         self.filename = filename
         self._cache = {}
         self._dirty_flags = {}
+        self._pending_writes = {}
+        self._dirty = False
         self.init_excel_file()
+        self.flush()
         self.clear_cache()
 
     def init_excel_file(self):
@@ -79,7 +85,7 @@ class ExcelManager:
                             self.write_sheet("供应商", df)
                 wb.close()
             except (PermissionError, OSError) as e:
-                print(f"检查Excel文件结构时出错: {e}")
+                self.logger.error(f"检查Excel文件结构时出错: {e}")
     
     def read_sheet(self, sheet_name: str):
         """读取指定工作表的数据（带缓存）"""
@@ -110,87 +116,67 @@ class ExcelManager:
             self._dirty_flags[sheet_name] = False
             return df
         except (FileNotFoundError, PermissionError, ValueError, OSError) as e:
-            print(f"读取工作表 {sheet_name} 出错: {e}")
+            self.logger.error(f"读取工作表 {sheet_name} 出错: {e}")
             return pd.DataFrame()
     
     def clear_cache(self, sheet_name: str = None):
         """清空所有缓存数据"""
+        if sheet_name is None:
+            self.flush()
         self._cache.clear()
         self._dirty_flags.clear()
+        if sheet_name is None:
+            self._pending_writes.clear()
+            self._dirty = False
     
     def write_sheet(self, sheet_name: str, data):
-        """写入数据到指定工作表（更新缓存）"""
-        try:
-            wb = load_workbook(self.filename)
-            
-            # 如果工作表存在，先删除
-            if sheet_name in wb.sheetnames:
-                wb.remove(wb[sheet_name])
-            
-            # 创建新的工作表
-            ws = wb.create_sheet(sheet_name)
-            
-            # 写入标题行 - 即使数据为空也要保留列名
-            # 确定要写入的列名
-            expected_columns = {
-                "商品信息": ["商品编号", "茶类", "品种", "公司", "产区", "商品名称", "规格", "成本价", "零售价", "生产日期", "保质期(月)", "当前库存", "品质特征", "年份", "等级", "单位"],
-                "销售记录": ["销售编号", "商品编号", "商品名称", "销售数量", "单价", "应收金额", "实收金额", "客户名称", "销售日期", "销售单位", "是否作废"],
-                "进货记录": ["进货编号", "商品编号", "商品名称", "进货数量", "进货单价", "供应商", "进货日期", "备注", "进货单位"],
-                "供应商": ["供应商编号", "供应商名称", "联系人", "联系电话", "地址", "累计交易金额", "备注"],
-                "客户信息": ["客户编号", "客户名称", "联系电话", "电子邮箱", "地址", "累计消费", "订单数", "最后购买日期", "客户等级", "备注", "创建日期"]
-            }
-            
-            # 复制数据，避免修改原数据
-            data_to_write = data.copy() if not data.empty else data
-            
-            # 如果是商品信息表，确保当前库存保留两位小数
-            if sheet_name == "商品信息" and not data_to_write.empty and '当前库存' in data_to_write.columns:
-                data_to_write['当前库存'] = pd.to_numeric(data_to_write['当前库存'], errors='coerce').fillna(0).round(2)
-            
-            # 如果数据有列名，使用数据的列名；否则使用默认列名
-            if not data_to_write.empty:
-                columns_to_write = data_to_write.columns.tolist()
-            elif sheet_name in expected_columns:
-                columns_to_write = expected_columns[sheet_name]
-            else:
-                columns_to_write = []
-            
-            # 写入标题行
-            if columns_to_write:
-                ws.append(columns_to_write)
-            
-            # 写入数据行 - 使用批量方式写入
-            if not data_to_write.empty:
-                for _, row in data_to_write.iterrows():
-                    ws.append(row.tolist())
-            
-            wb.save(self.filename)
-            self._cache[sheet_name] = data_to_write.copy()
-            self._dirty_flags[sheet_name] = False
-        except (PermissionError, OSError) as e:
-            print(f"写入工作表 {sheet_name} 出错: {e}")
+        """写入数据到指定工作表（延迟写入）"""
+        expected_columns = {
+            "商品信息": ["商品编号", "茶类", "品种", "公司", "产区", "商品名称", "规格", "成本价", "零售价", "生产日期", "保质期(月)", "当前库存", "品质特征", "年份", "等级", "单位"],
+            "销售记录": ["销售编号", "商品编号", "商品名称", "销售数量", "单价", "应收金额", "实收金额", "客户名称", "销售日期", "销售单位", "是否作废"],
+            "进货记录": ["进货编号", "商品编号", "商品名称", "进货数量", "进货单价", "供应商", "进货日期", "备注", "进货单位"],
+            "供应商": ["供应商编号", "供应商名称", "联系人", "联系电话", "地址", "累计交易金额", "备注"],
+            "客户信息": ["客户编号", "客户名称", "联系电话", "电子邮箱", "地址", "累计消费", "订单数", "最后购买日期", "客户等级", "备注", "创建日期"]
+        }
+
+        data_to_write = data.copy() if not data.empty else data
+
+        if sheet_name == "商品信息" and not data_to_write.empty and '当前库存' in data_to_write.columns:
+            data_to_write['当前库存'] = pd.to_numeric(data_to_write['当前库存'], errors='coerce').fillna(0).round(2)
+
+        if not data_to_write.empty:
+            columns_to_write = data_to_write.columns.tolist()
+        elif sheet_name in expected_columns:
+            columns_to_write = expected_columns[sheet_name]
+            data_to_write = pd.DataFrame(columns=columns_to_write)
+        else:
+            columns_to_write = []
+            data_to_write = pd.DataFrame(columns=columns_to_write)
+
+        self._pending_writes[sheet_name] = data_to_write
+        self._dirty = True
+        self._cache[sheet_name] = data_to_write.copy()
+        self._dirty_flags[sheet_name] = False
     
     def append_to_sheet(self, sheet_name, data_row):
         """向指定工作表追加一行数据（更新缓存）"""
+        self.flush()
         try:
             wb = load_workbook(self.filename)
             ws = wb[sheet_name]
-            
-            # 如果是DataFrame，则逐行添加
+
             if isinstance(data_row, pd.DataFrame):
                 for _, row in data_row.iterrows():
                     ws.append(row.tolist())
             else:
-                # 如果是列表或元组
                 ws.append(data_row)
-            
+
             wb.save(self.filename)
-            # 清除该工作表的缓存，下次读取时重新加载
             if sheet_name in self._cache:
                 del self._cache[sheet_name]
                 del self._dirty_flags[sheet_name]
         except (PermissionError, OSError) as e:
-            print(f"追加数据到工作表 {sheet_name} 出错: {e}")
+            self.logger.error(f"追加数据到工作表 {sheet_name} 出错: {e}")
     
     def generate_id(self, prefix: str, sheet_name: str = None, id_column: str = None):
         """生成唯一ID"""
@@ -429,24 +415,24 @@ class ExcelManager:
     # 供应商相关操作
     def get_all_suppliers(self):
         try:
-            print("=== 开始读取供应商数据 ===")
+            self.logger.debug("=== 开始读取供应商数据 ===")
             df = self.read_sheet("供应商")
-            print(f"原始数据行数: {len(df)}")
-            print(f"原始数据列名: {list(df.columns)}")
-            print(f"原始数据是否为空: {df.empty}")
+            self.logger.debug(f"原始数据行数: {len(df)}")
+            self.logger.debug(f"原始数据列名: {list(df.columns)}")
+            self.logger.debug(f"原始数据是否为空: {df.empty}")
             
             # 检查数据
             if not df.empty:
                 # 打印原始数据的前几行
-                print("\n原始数据前3行:")
+                self.logger.debug("\n原始数据前3行:")
                 for i in range(min(3, len(df))):
-                    print(f"  行 {i+1}: {list(df.iloc[i])}")
+                    self.logger.debug(f"  行 {i+1}: {list(df.iloc[i])}")
             
             # 数据清理
             if not df.empty:
                 # 1. 首先移除所有字段都是 NaN 的行
                 df = df.dropna(how='all')
-                print(f"\n移除全 NaN 行后，行数: {len(df)}")
+                self.logger.debug(f"\n移除全 NaN 行后，行数: {len(df)}")
                 
                 if not df.empty:
                     # 2. 只对文本列进行字符串转换和去空白
@@ -462,17 +448,17 @@ class ExcelManager:
                     
                     # 4. 重置索引
                     df = df.reset_index(drop=True)
-                    print(f"清理后的数据行数: {len(df)}")
+                    self.logger.debug(f"清理后的数据行数: {len(df)}")
                     
                     if not df.empty:
-                        print("\n清理后的数据:")
+                        self.logger.debug("\n清理后的数据:")
                         for index, row in df.iterrows():
-                            print(f"  行 {index+1}: {list(row)}")
+                            self.logger.debug(f"  行 {index+1}: {list(row)}")
             
-            print("=== 读取供应商数据完成 ===")
+            self.logger.debug("=== 读取供应商数据完成 ===")
             return df
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"获取供应商数据时出错: {e}")
+            self.logger.error(f"获取供应商数据时出错: {e}")
             import traceback
             traceback.print_exc()
             return pd.DataFrame()
@@ -513,7 +499,7 @@ class ExcelManager:
             
             # 保存更新
             self.write_sheet("供应商", df)
-            print(f"供应商 {supplier_name} 已更新，累计交易金额: {new_amount}")
+            self.logger.info(f"供应商 {supplier_name} 已更新，累计交易金额: {new_amount}")
 
     def _create_new_supplier(self, supplier_name, amount, stock_date):
         """创建新供应商"""
@@ -526,29 +512,29 @@ class ExcelManager:
         ]
         
         self.append_to_sheet("供应商", supplier_data)
-        print(f"新供应商 {supplier_name} 创建成功，供应商编号: {supplier_id}，初始累计交易金额: {amount}")
+        self.logger.info(f"新供应商 {supplier_name} 创建成功，供应商编号: {supplier_id}，初始累计交易金额: {amount}")
 
     # 客户相关操作
     def get_all_customers(self):
         try:
-            print("=== 开始读取客户数据 ===")
+            self.logger.debug("=== 开始读取客户数据 ===")
             df = self.read_sheet("客户信息")
-            print(f"原始数据行数: {len(df)}")
-            print(f"原始数据列名: {list(df.columns)}")
-            print(f"原始数据是否为空: {df.empty}")
+            self.logger.debug(f"原始数据行数: {len(df)}")
+            self.logger.debug(f"原始数据列名: {list(df.columns)}")
+            self.logger.debug(f"原始数据是否为空: {df.empty}")
             
             # 检查数据
             if not df.empty:
                 # 打印原始数据的前几行
-                print("\n原始数据前3行:")
+                self.logger.debug("\n原始数据前3行:")
                 for i in range(min(3, len(df))):
-                    print(f"  行 {i+1}: {list(df.iloc[i])}")
+                    self.logger.debug(f"  行 {i+1}: {list(df.iloc[i])}")
             
             # 数据清理
             if not df.empty:
                 # 1. 首先移除所有字段都是 NaN 的行
                 df = df.dropna(how='all')
-                print(f"\n移除全 NaN 行后，行数: {len(df)}")
+                self.logger.debug(f"\n移除全 NaN 行后，行数: {len(df)}")
                 
                 if not df.empty:
                     # 2. 确保累计消费列是浮点类型
@@ -578,21 +564,21 @@ class ExcelManager:
                         # 如果有等级变化，保存到 Excel
                         if need_update:
                             self.write_sheet("客户信息", df)
-                            print(f"已自动更新 {len(df)} 位客户的等级")
+                            self.logger.info(f"已自动更新 {len(df)} 位客户的等级")
                     
                     # 5. 重置索引
                     df = df.reset_index(drop=True)
-                    print(f"清理后的数据行数: {len(df)}")
+                    self.logger.debug(f"清理后的数据行数: {len(df)}")
                     
                     if not df.empty:
-                        print("\n清理后的数据:")
+                        self.logger.debug("\n清理后的数据:")
                         for index, row in df.iterrows():
-                            print(f"  行 {index+1}: {list(row)}")
+                            self.logger.debug(f"  行 {index+1}: {list(row)}")
             
-            print("=== 读取客户数据完成 ===")
+            self.logger.debug("=== 读取客户数据完成 ===")
             return df
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"获取客户数据时出错: {e}")
+            self.logger.error(f"获取客户数据时出错: {e}")
             import traceback
             traceback.print_exc()
             return pd.DataFrame()
@@ -801,6 +787,85 @@ class ExcelManager:
         self.write_sheet("销售记录", df)
         return True
 
+    def flush(self):
+        """批量写入所有待处理的sheet到Excel文件"""
+        if not self._dirty or not self._pending_writes:
+            return
+
+        backup_filename = None
+        try:
+            if os.path.exists(self.filename):
+                backup_filename = self.filename + ".backup"
+                shutil.copy2(self.filename, backup_filename)
+
+            wb = load_workbook(self.filename) if os.path.exists(self.filename) else Workbook()
+            if not wb.sheetnames:
+                wb.active.title = "Sheet"
+
+            for sheet_name, data_to_write in self._pending_writes.items():
+                existing_columns = None
+                sheet_exists = sheet_name in wb.sheetnames
+
+                if sheet_exists:
+                    ws = wb[sheet_name]
+                    if ws.max_row > 0:
+                        existing_columns = [cell.value for cell in ws[1]]
+
+                new_columns = data_to_write.columns.tolist() if not data_to_write.empty else []
+
+                if sheet_exists and existing_columns == new_columns:
+                    ws = wb[sheet_name]
+                    for row in ws.iter_rows(min_row=2, max_row=ws.max_row, max_col=ws.max_column):
+                        for cell in row:
+                            cell.value = None
+                    ws.delete_rows(2, ws.max_row - 1)
+                    ws = wb[sheet_name]
+                else:
+                    if sheet_exists:
+                        wb.remove(wb[sheet_name])
+                    ws = wb.create_sheet(sheet_name)
+
+                if new_columns:
+                    ws.append(new_columns)
+
+                if not data_to_write.empty:
+                    row_count = 0
+                    for row in dataframe_to_rows(data_to_write, index=False, header=False):
+                        ws.append(row)
+                        row_count += 1
+
+            if "Sheet" in wb.sheetnames and len(wb.sheetnames) > 1:
+                wb.remove(wb["Sheet"])
+
+            wb.save(self.filename)
+
+            if backup_filename and os.path.exists(backup_filename):
+                os.remove(backup_filename)
+
+            self._pending_writes.clear()
+            self._dirty = False
+        except (PermissionError, OSError) as e:
+            self.logger.error(f"批量写入Excel文件出错: {e}")
+            if backup_filename and os.path.exists(backup_filename):
+                try:
+                    shutil.copy2(backup_filename, self.filename)
+                    os.remove(backup_filename)
+                    self.logger.info("写入失败，已回滚到备份文件")
+                except Exception as rollback_error:
+                    self.logger.error(f"回滚失败: {rollback_error}")
+            raise
+
+    def auto_flush(self):
+        """返回一个上下文管理器，退出时自动调用 flush()"""
+        return _AutoFlushContext(self)
+
+    def __del__(self):
+        try:
+            self.flush()
+        except Exception:
+            pass
+
+
     def void_sale(self, sale_id):
         """作废销售记录，回滚库存"""
         df = self.read_sheet("销售记录")
@@ -824,3 +889,15 @@ class ExcelManager:
         df.at[idx[0], '是否作废'] = True
         self.write_sheet("销售记录", df)
         return True
+
+
+class _AutoFlushContext:
+    def __init__(self, manager):
+        self._manager = manager
+
+    def __enter__(self):
+        return self._manager
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._manager.flush()
+        return False

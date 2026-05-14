@@ -16,7 +16,7 @@
     "check_on_startup": true
   },
   "ui": {
-    "theme": "default",
+    "theme": "light",
     "window_width": 1200,
     "window_height": 800,
     "show_status_bar": true
@@ -125,6 +125,10 @@
     "query_sales_by_customer": {
       "width": 700,
       "height": 360
+    },
+    "query_sales_by_date": {
+      "width": 567,
+      "height": 421
     }
   },
   "export": {

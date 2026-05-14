@@ -31,7 +31,8 @@ class SettingsViewMixin:
         buttons = [
             ("数据备份管理", self.backup_management, "💾"),
             ("云端同步管理", self.cloud_sync_management, "☁️"),
-            ("操作日志查询", self.log_management, "📝")
+            ("操作日志查询", self.log_management, "📝"),
+            ("切换亮色/暗色主题", self.toggle_theme, "🌓")
         ]
         self._create_button_grid(buttons_container, buttons, columns=2)
         

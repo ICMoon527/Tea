@@ -3,6 +3,7 @@ import os
 import copy
 from typing import Dict, Any, Optional
 from datetime import datetime
+from logger import get_logger
 
 
 class ConfigManager:
@@ -26,7 +27,7 @@ class ConfigManager:
             "check_on_startup": True
         },
         "ui": {
-            "theme": "default",
+            "theme": "light",
             "window_width": 1200,
             "window_height": 800,
             "show_status_bar": True
@@ -39,6 +40,7 @@ class ConfigManager:
     }
     
     def __init__(self, config_file: str = "config.json"):
+        self.logger = get_logger()
         self.config_file = config_file
         self.config = self._load_config()
     
@@ -60,7 +62,7 @@ class ConfigManager:
             config = self._merge_config(copy.deepcopy(self.DEFAULT_CONFIG), config)
             return config
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
-            print(f"加载配置文件失败: {e}")
+            self.logger.error(f"加载配置文件失败: {e}")
             return copy.deepcopy(self.DEFAULT_CONFIG)
     
     def _merge_config(self, default: Dict, user: Dict) -> Dict:
@@ -100,7 +102,7 @@ class ConfigManager:
                 json.dump(config, f, ensure_ascii=False, indent=2)
             return True
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
-            print(f"保存配置文件失败: {e}")
+            self.logger.error(f"保存配置文件失败: {e}")
             return False
     
     def get(self, key: str, default: Any = None) -> Any:
@@ -145,7 +147,7 @@ class ConfigManager:
             config[keys[-1]] = value
             return self._save_config()
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
-            print(f"设置配置失败: {e}")
+            self.logger.error(f"设置配置失败: {e}")
             return False
     
     def get_all(self) -> Dict[str, Any]:
@@ -186,7 +188,7 @@ class ConfigManager:
             shutil.copy2(self.config_file, backup_file)
             return backup_file
         except (FileNotFoundError, PermissionError, OSError) as e:
-            print(f"备份配置文件失败: {e}")
+            self.logger.error(f"备份配置文件失败: {e}")
             return ""
     
     def get_app_info(self) -> Dict[str, str]:
@@ -270,7 +272,7 @@ class ConfigManager:
             }
             return self._save_config()
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
-            print(f"保存窗口大小失败: {e}")
+            self.logger.error(f"保存窗口大小失败: {e}")
             return False
     
     def load_window_size(self, window_id: str, default_width: int, default_height: int) -> tuple:
@@ -290,7 +292,7 @@ class ConfigManager:
                 size = window_sizes[window_id]
                 return (size.get('width', default_width), size.get('height', default_height))
         except (KeyError, TypeError, json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
-            print(f"加载窗口大小失败: {e}")
+            self.logger.error(f"加载窗口大小失败: {e}")
         
         return (default_width, default_height)
     
@@ -304,5 +306,5 @@ class ConfigManager:
             self.config['window_sizes'] = {}
             return self._save_config()
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
-            print(f"重置窗口大小失败: {e}")
+            self.logger.error(f"重置窗口大小失败: {e}")
             return False

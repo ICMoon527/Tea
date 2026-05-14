@@ -4,6 +4,10 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 from styles import Styles
+from validators import validate_required, validate_phone, highlight_entry_error, clear_entry_highlight
+from logger import get_logger
+
+_logger = get_logger()
 
 
 class SupplierViewMixin:
@@ -39,13 +43,13 @@ class SupplierViewMixin:
     def view_all_suppliers(self):
         df = self.system.excel_manager.get_all_suppliers()
         # 添加调试信息
-        print(f"供应商数据行数: {len(df)}")
-        print(f"供应商数据列数: {len(df.columns)}")
-        print(f"列名: {list(df.columns)}")
-        print(f"是否为空: {df.empty}")
+        _logger.debug(f"供应商数据行数: {len(df)}")
+        _logger.debug(f"供应商数据列数: {len(df.columns)}")
+        _logger.debug(f"列名: {list(df.columns)}")
+        _logger.debug(f"是否为空: {df.empty}")
         if not df.empty:
-            print("前5行数据:")
-            print(df.head())
+            _logger.debug("前5行数据:")
+            _logger.debug(df.head())
         # 显示供应商数据的基本信息
         self.show_dataframe_window(df, "供应商列表")
 
@@ -83,21 +87,24 @@ class SupplierViewMixin:
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="供应商编号 (留空自动生成)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         supplier_id_var = tk.StringVar()
-        tk.Entry(frame, textvariable=supplier_id_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        supplier_id_entry = tk.Entry(frame, textvariable=supplier_id_var, font=Styles.TEXT_FONT)
+        supplier_id_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 供应商名称
         frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="供应商名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         name_var = tk.StringVar()
-        tk.Entry(frame, textvariable=name_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        name_entry = tk.Entry(frame, textvariable=name_var, font=Styles.TEXT_FONT)
+        name_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 联系人
         frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="联系人", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         contact_var = tk.StringVar()
-        tk.Entry(frame, textvariable=contact_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        contact_entry = tk.Entry(frame, textvariable=contact_var, font=Styles.TEXT_FONT)
+        contact_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 右列字段
         # 联系电话
@@ -105,7 +112,8 @@ class SupplierViewMixin:
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="联系电话", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         phone_var = tk.StringVar()
-        tk.Entry(frame, textvariable=phone_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        phone_entry = tk.Entry(frame, textvariable=phone_var, font=Styles.TEXT_FONT)
+        phone_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 地址
         frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
@@ -123,36 +131,45 @@ class SupplierViewMixin:
 
         def submit():
             try:
-                supplier_id_input = supplier_id_var.get().strip()
-                if supplier_id_input:
-                    supplier_id = supplier_id_input
-                    df = self.system.excel_manager.get_all_suppliers()
-                    if not df.empty:
-                        existing = df[df['供应商编号'] == supplier_id]
-                        if not existing.empty:
-                            messagebox.showerror("错误", "该供应商编号已存在！")
-                            return
-                else:
-                    supplier_id = self.system.excel_manager.generate_id("SP", "供应商", "供应商编号")
+                errors = []
+                result = validate_required(name_var.get(), "供应商名称")
+                if not result: errors.append(result.error_message); highlight_entry_error(name_entry)
+                else: clear_entry_highlight(name_entry)
+                result = validate_phone(phone_var.get(), "联系电话")
+                if not result: errors.append(result.error_message); highlight_entry_error(phone_entry)
+                else: clear_entry_highlight(phone_entry)
 
+                if errors:
+                    messagebox.showwarning("输入校验", "\n".join(errors))
+                    return
+
+                supplier_id_input = supplier_id_var.get().strip()
                 name = name_var.get().strip()
                 contact_person = contact_var.get().strip()
                 phone = phone_var.get().strip()
                 address = address_var.get().strip()
                 remarks = remarks_var.get().strip()
 
-                from supplier import Supplier
-                supplier = Supplier(
-                    supplier_id=supplier_id,
-                    name=name,
-                    contact_person=contact_person,
-                    phone=phone,
-                    address=address,
-                    remarks=remarks
+                result = self.system.add_supplier_business(
+                    supplier_id_input=supplier_id_input, name=name,
+                    contact_person=contact_person, phone=phone,
+                    address=address, remarks=remarks
                 )
 
-                self.system.excel_manager.add_supplier(supplier.to_list())
-                messagebox.showinfo("成功", f"供应商添加成功！\n供应商编号: {supplier_id}")
+                if not result['success']:
+                    messagebox.showerror("错误", result['message'])
+                    return
+
+                new_supplier_id = result['supplier_id']
+                supplier_data = [new_supplier_id, name, contact_person, phone, address, 0.0, remarks]
+                self.undo_manager.record_action(
+                    f"添加供应商：{name}",
+                    undo_func=lambda sid=new_supplier_id: self.system.excel_manager.delete_record("供应商", sid, "供应商编号"),
+                    redo_func=lambda sd=supplier_data: self.system.excel_manager.append_to_sheet("供应商", sd)
+                )
+                self._update_status_bar()
+
+                messagebox.showinfo("成功", f"供应商添加成功！\n供应商编号: {new_supplier_id}")
                 top.destroy()
             except Exception as e:
                 messagebox.showerror("错误", f"添加失败: {e}")
@@ -238,6 +255,7 @@ class SupplierViewMixin:
 
             # 创建变量
             vars = {}
+            entries = {}
             
             # 左列字段
             fields_left = [
@@ -251,7 +269,9 @@ class SupplierViewMixin:
                 tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
                 var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+                entry = tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT)
+                entry.pack(fill=tk.X, pady=(2, 0))
+                entries[key] = entry
             
             # 右列字段
             fields_right = [
@@ -266,35 +286,49 @@ class SupplierViewMixin:
                 tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
                 var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+                entry = tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT)
+                entry.pack(fill=tk.X, pady=(2, 0))
+                entries[key] = entry
 
             def save():
+                errors = []
+                result = validate_required(vars["供应商名称"].get(), "供应商名称")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries["供应商名称"])
+                else: clear_entry_highlight(entries["供应商名称"])
+                result = validate_phone(vars["联系电话"].get(), "联系电话")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries["联系电话"])
+                else: clear_entry_highlight(entries["联系电话"])
+
+                if errors:
+                    messagebox.showwarning("输入校验", "\n".join(errors))
+                    return
+
                 updates = {}
                 for key, var in vars.items():
                     value = var.get().strip()
                     updates[key] = value if value else ""
 
                 if updates:
-                    # 获取所有供应商数据
-                    all_suppliers = self.system.excel_manager.get_all_suppliers()
-                    # 找到要修改的供应商
-                    idx = all_suppliers[all_suppliers['供应商编号'] == supplier_id].index
-                    if len(idx) > 0:
-                        # 更新数据
-                        for key, value in updates.items():
-                            # 确保值不为空字符串时再更新
-                            if value:
-                                all_suppliers.at[idx[0], key] = value
-                            else:
-                                # 对于空值，保持原有值不变
-                                pass
-                        # 写回Excel
-                        self.system.excel_manager.write_sheet("供应商", all_suppliers)
+                    old_data = {
+                        '供应商名称': supplier_row['供应商名称'],
+                        '联系人': supplier_row['联系人'],
+                        '联系电话': supplier_row['联系电话'],
+                        '地址': supplier_row['地址'],
+                        '备注': supplier_row.get('备注', '')
+                    }
+                    update_result = self.system.update_supplier_business(supplier_id, updates)
+                    if update_result['success']:
+                        self.undo_manager.record_action(
+                            f"修改供应商：{supplier_row['供应商名称']}",
+                            undo_func=lambda sid=supplier_id, old=dict(old_data): self.system.update_supplier_business(sid, old),
+                            redo_func=lambda sid=supplier_id, upd=dict(updates): self.system.update_supplier_business(sid, upd)
+                        )
+                        self._update_status_bar()
                         messagebox.showinfo("成功", "供应商信息更新成功！")
                         edit_top.destroy()
                         top.destroy()
                     else:
-                        messagebox.showerror("错误", "更新失败！")
+                        messagebox.showerror("错误", update_result['message'])
                 else:
                     messagebox.showinfo("提示", "未做任何修改。")
 
@@ -351,23 +385,31 @@ class SupplierViewMixin:
 
         def delete():
             supplier_id = supplier_id_var.get().strip()
-            df = self.system.excel_manager.get_all_suppliers()
-            if df.empty:
+            all_suppliers = self.system.excel_manager.get_all_suppliers()
+            if all_suppliers.empty:
                 messagebox.showerror("错误", "未找到供应商信息")
                 return
 
-            supplier = df[df['供应商编号'] == supplier_id]
-            if supplier.empty:
+            supplier_row = all_suppliers[all_suppliers['供应商编号'] == supplier_id]
+            if supplier_row.empty:
                 messagebox.showerror("错误", "未找到该供应商")
                 return
 
-            supplier_row = supplier.iloc[0]
-            if messagebox.askyesno("确认", f"确定要删除供应商 '{supplier_row['供应商名称']}' 吗？"):
-                # 删除供应商
-                new_df = df[df['供应商编号'] != supplier_id]
-                self.system.excel_manager.write_sheet("供应商", new_df)
-                messagebox.showinfo("成功", "供应商删除成功！")
-                top.destroy()
+            if messagebox.askyesno("确认", f"确定要删除供应商 '{supplier_row.iloc[0]['供应商名称']}' 吗？"):
+                supplier_name = supplier_row.iloc[0]['供应商名称']
+                saved_row = supplier_row.iloc[0].to_list()
+                result = self.system.delete_supplier_business(supplier_id)
+                if result['success']:
+                    self.undo_manager.record_action(
+                        f"删除供应商：{supplier_name}",
+                        undo_func=lambda sd=list(saved_row): self.system.excel_manager.append_to_sheet("供应商", sd),
+                        redo_func=lambda sid=supplier_id: self.system.delete_supplier_business(sid)
+                    )
+                    self._update_status_bar()
+                    messagebox.showinfo("成功", "供应商删除成功！")
+                    top.destroy()
+                else:
+                    messagebox.showerror("错误", result['message'])
 
         btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         btn_frame.pack(pady=Styles.PADY_MEDIUM)

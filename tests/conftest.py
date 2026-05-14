@@ -6,7 +6,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from excel_manager import ExcelManager
-from tea_inventory_system import ShoppingCart
+from shopping_cart import ShoppingCart
 
 
 @pytest.fixture

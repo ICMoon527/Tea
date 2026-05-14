@@ -4,6 +4,8 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 from styles import Styles
+from validators import validate_required, validate_numeric, validate_integer, highlight_entry_error, clear_entry_highlight
+from tea_commodity import TeaCommodity
 
 
 class ProductViewMixin:
@@ -101,13 +103,16 @@ class ProductViewMixin:
         ]
 
         vars_left = {}
+        entries_left = {}
         for i, (label_text, key, default) in enumerate(fields_left):
             frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
             frame.pack(fill=tk.X, pady=3)
             tk.Label(frame, text=label_text, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
             var = tk.StringVar(value=default)
             vars_left[key] = var
-            tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+            entry = tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT)
+            entry.pack(fill=tk.X, pady=(2, 0))
+            entries_left[key] = entry
 
         com_id_var = vars_left["com_id"]
         tea_category_var = vars_left["tea_category"]
@@ -131,13 +136,16 @@ class ProductViewMixin:
         ]
 
         vars_right = {}
+        entries_right = {}
         for i, (label_text, key, default) in enumerate(fields_right):
             frame = tk.Frame(right_col, bg=Styles.BACKGROUND_COLOR)
             frame.pack(fill=tk.X, pady=3)
             tk.Label(frame, text=label_text, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
             var = tk.StringVar(value=default)
             vars_right[key] = var
-            tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+            entry = tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT)
+            entry.pack(fill=tk.X, pady=(2, 0))
+            entries_right[key] = entry
 
         retail_price_var = vars_right["retail_price"]
         current_stock_var = vars_right["current_stock"]
@@ -154,42 +162,37 @@ class ProductViewMixin:
 
         def submit():
             try:
-                # 验证必填字段
-                if not tea_category_var.get().strip():
-                    messagebox.showerror("错误", "请输入茶类")
-                    return
-                if not variety_var.get().strip():
-                    messagebox.showerror("错误", "请输入品种")
-                    return
-                if not name_var.get().strip():
-                    messagebox.showerror("错误", "请输入商品名称")
-                    return
-                if not specification_var.get().strip():
-                    messagebox.showerror("错误", "请输入规格")
-                    return
-                if not cost_price_var.get().strip():
-                    messagebox.showerror("错误", "请输入成本价")
-                    return
-                if not retail_price_var.get().strip():
-                    messagebox.showerror("错误", "请输入零售价")
-                    return
-                if not current_stock_var.get().strip():
-                    messagebox.showerror("错误", "请输入初始库存")
-                    return
-                if not shelf_life_var.get().strip():
-                    messagebox.showerror("错误", "请输入保质期")
+                errors = []
+                result = validate_required(tea_category_var.get(), "茶类")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_left["tea_category"])
+                else: clear_entry_highlight(entries_left["tea_category"])
+                result = validate_required(variety_var.get(), "品种")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_left["variety"])
+                else: clear_entry_highlight(entries_left["variety"])
+                result = validate_required(name_var.get(), "商品名称")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_left["name"])
+                else: clear_entry_highlight(entries_left["name"])
+                result = validate_required(specification_var.get(), "规格")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_left["specification"])
+                else: clear_entry_highlight(entries_left["specification"])
+                result = validate_numeric(cost_price_var.get(), "成本价", min_val=0)
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_left["cost_price"])
+                else: clear_entry_highlight(entries_left["cost_price"])
+                result = validate_numeric(retail_price_var.get(), "零售价", min_val=0)
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_right["retail_price"])
+                else: clear_entry_highlight(entries_right["retail_price"])
+                result = validate_numeric(current_stock_var.get(), "初始库存", min_val=0)
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_right["current_stock"])
+                else: clear_entry_highlight(entries_right["current_stock"])
+                result = validate_integer(shelf_life_var.get(), "保质期", min_val=0)
+                if not result: errors.append(result.error_message); highlight_entry_error(entries_right["shelf_life"])
+                else: clear_entry_highlight(entries_right["shelf_life"])
+
+                if errors:
+                    messagebox.showwarning("输入校验", "\n".join(errors))
                     return
 
                 com_id_input = com_id_var.get().strip()
-                if com_id_input:
-                    com_id = com_id_input
-                    existing = self.system.excel_manager.get_commodity_by_id(com_id)
-                    if existing is not None:
-                        messagebox.showerror("错误", "该商品编号已存在！")
-                        return
-                else:
-                    com_id = self.system.excel_manager.generate_id("C", "商品信息", "商品编号")
-
                 tea_category = tea_category_var.get().strip()
                 variety = variety_var.get().strip()
                 company = company_var.get().strip()
@@ -208,18 +211,39 @@ class ProductViewMixin:
                 grade = grade_var.get().strip()
                 unit = unit_var.get().strip() or "斤"
 
-                from tea_commodity import TeaCommodity
-                commodity = TeaCommodity(
-                    com_id=com_id, tea_category=tea_category, variety=variety,
-                    company=company, origin=origin, name=name,
-                    specification=specification, cost_price=cost_price,
-                    retail_price=retail_price, production_date=production_date,
-                    shelf_life=shelf_life, current_stock=current_stock,
-                    quality_features=quality_features, year=year, grade=grade, unit=unit
+                result = self.system.add_commodity_business(
+                    com_id_input=com_id_input, tea_category=tea_category,
+                    variety=variety, company=company, origin=origin,
+                    name=name, specification=specification,
+                    cost_price=cost_price, retail_price=retail_price,
+                    current_stock=current_stock, production_date=production_date,
+                    shelf_life=shelf_life, quality_features=quality_features,
+                    year=year, grade=grade, unit=unit
                 )
 
-                self.system.excel_manager.add_commodity(commodity.to_list())
-                messagebox.showinfo("成功", f"商品添加成功！\n商品编号: {com_id}")
+                if not result['success']:
+                    messagebox.showerror("错误", result['message'])
+                    return
+
+                new_com_id = result['com_id']
+                commodity_data = TeaCommodity(
+                    com_id=new_com_id, tea_category=tea_category,
+                    variety=variety, company=company, origin=origin,
+                    name=name, specification=specification,
+                    cost_price=cost_price, retail_price=retail_price,
+                    current_stock=current_stock, production_date=production_date,
+                    shelf_life=shelf_life, quality_features=quality_features,
+                    year=year, grade=grade, unit=unit
+                ).to_list()
+
+                self.undo_manager.record_action(
+                    f"添加商品：{name}",
+                    undo_func=lambda cid=new_com_id: self.system.excel_manager.delete_commodity(cid),
+                    redo_func=lambda data=commodity_data: self.system.excel_manager.add_commodity(data)
+                )
+                self._update_status_bar()
+
+                messagebox.showinfo("成功", f"商品添加成功！\n商品编号: {new_com_id}")
                 top.destroy()
             except ValueError as e:
                 messagebox.showerror("错误", f"数据输入错误: {e}")
@@ -346,6 +370,7 @@ class ProductViewMixin:
 
             # 创建变量
             vars = {}
+            entries = {}
             fields_left = [
                 ("商品编号", "商品编号", commodity['商品编号']),
                 ("茶类", "茶类", commodity['茶类']),
@@ -363,7 +388,9 @@ class ProductViewMixin:
                 tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
                 var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+                entry = tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT)
+                entry.pack(fill=tk.X, pady=(2, 0))
+                entries[key] = entry
 
             fields_right = [
                 ("零售价", "零售价", commodity['零售价']),
@@ -382,9 +409,32 @@ class ProductViewMixin:
                 tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
                 var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+                entry = tk.Entry(frame, textvariable=var, width=28, font=Styles.TEXT_FONT)
+                entry.pack(fill=tk.X, pady=(2, 0))
+                entries[key] = entry
 
             def save():
+                errors = []
+                result = validate_required(vars["商品名称"].get(), "商品名称")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries["商品名称"])
+                else: clear_entry_highlight(entries["商品名称"])
+                for key in ['成本价', '零售价', '当前库存']:
+                    val = vars[key].get().strip()
+                    if val:
+                        result = validate_numeric(val, key, min_val=0)
+                        if not result: errors.append(result.error_message); highlight_entry_error(entries[key])
+                        else: clear_entry_highlight(entries[key])
+                for key in ['保质期(月)']:
+                    val = vars[key].get().strip()
+                    if val:
+                        result = validate_integer(val, key, min_val=0)
+                        if not result: errors.append(result.error_message); highlight_entry_error(entries[key])
+                        else: clear_entry_highlight(entries[key])
+
+                if errors:
+                    messagebox.showwarning("输入校验", "\n".join(errors))
+                    return
+
                 updates = {}
                 for key, var in vars.items():
                     value = var.get().strip()
@@ -397,8 +447,15 @@ class ProductViewMixin:
                             updates[key] = value
 
                 if updates:
+                    old_data = dict(commodity)
                     success = self.system.excel_manager.update_commodity(com_id, updates)
                     if success.get('success'):
+                        self.undo_manager.record_action(
+                            f"修改商品：{commodity['商品名称']}",
+                            undo_func=lambda cid=com_id, old=old_data: self.system.excel_manager.update_commodity(cid, old),
+                            redo_func=lambda cid=com_id, upd=updates: self.system.excel_manager.update_commodity(cid, upd)
+                        )
+                        self._update_status_bar()
                         messagebox.showinfo("成功", "商品信息更新成功！")
                         edit_top.destroy()
                         top.destroy()
@@ -480,8 +537,19 @@ class ProductViewMixin:
                 return
 
             if messagebox.askyesno("确认", f"确定要删除商品 '{commodity['商品名称']}' 吗？"):
+                commodity_columns = ["商品编号", "茶类", "品种", "公司", "产区", "商品名称",
+                                     "规格", "成本价", "零售价", "生产日期", "保质期(月)",
+                                     "当前库存", "品质特征", "年份", "等级", "单位"]
+                saved_data = [commodity.get(col, "") for col in commodity_columns]
+                product_name = commodity['商品名称']
                 success = self.system.excel_manager.delete_commodity(com_id)
                 if success.get('success'):
+                    self.undo_manager.record_action(
+                        f"删除商品：{product_name}",
+                        undo_func=lambda data=saved_data: self.system.excel_manager.add_commodity(data),
+                        redo_func=lambda cid=com_id: self.system.excel_manager.delete_commodity(cid)
+                    )
+                    self._update_status_bar()
                     messagebox.showinfo("成功", "商品删除成功！")
                     top.destroy()
                 else:

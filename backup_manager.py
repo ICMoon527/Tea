@@ -3,12 +3,14 @@ import shutil
 from datetime import datetime
 from typing import List, Optional
 import pandas as pd
+from logger import get_logger
 
 
 class BackupManager:
     """数据备份与恢复管理器"""
     
     def __init__(self, data_file: str = "tea_inventory.xlsx", backup_dir: str = "backups"):
+        self.logger = get_logger()
         self.data_file = data_file
         self.backup_dir = backup_dir
         self.max_backups = 7
@@ -51,7 +53,7 @@ class BackupManager:
                 try:
                     os.remove(file_info['path'])
                 except (FileNotFoundError, PermissionError, OSError) as e:
-                    print(f"删除旧备份文件失败: {e}")
+                    self.logger.error(f"删除旧备份文件失败: {e}")
     
     def list_backups(self) -> List[dict]:
         """列出所有可用的备份文件
@@ -101,7 +103,7 @@ class BackupManager:
             shutil.copy2(backup_path, self.data_file)
             return True
         except (FileNotFoundError, PermissionError, OSError) as e:
-            print(f"恢复备份失败: {e}")
+            self.logger.error(f"恢复备份失败: {e}")
             return False
     
     def delete_backup(self, backup_path: str) -> bool:
@@ -119,7 +121,7 @@ class BackupManager:
                 return True
             return False
         except (FileNotFoundError, PermissionError, OSError) as e:
-            print(f"删除备份失败: {e}")
+            self.logger.error(f"删除备份失败: {e}")
             return False
     
     def get_backup_info(self, backup_path: str) -> Optional[dict]:
@@ -145,7 +147,7 @@ class BackupManager:
                 'modified_time': datetime.fromtimestamp(file_stat.st_mtime)
             }
         except (FileNotFoundError, PermissionError, OSError) as e:
-            print(f"获取备份信息失败: {e}")
+            self.logger.error(f"获取备份信息失败: {e}")
             return None
     
     def _format_size(self, size_bytes: int) -> str:

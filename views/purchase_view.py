@@ -4,6 +4,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 from styles import Styles
+from validators import validate_required, validate_numeric, highlight_entry_error, clear_entry_highlight
 
 
 class PurchaseViewMixin:
@@ -70,7 +71,8 @@ class PurchaseViewMixin:
         com_id_var = tk.StringVar()
         entry_frame = tk.Frame(frame, bg=Styles.BACKGROUND_COLOR)
         entry_frame.pack(fill=tk.X)
-        tk.Entry(entry_frame, textvariable=com_id_var, font=Styles.TEXT_FONT).pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(2, 0))
+        com_id_entry = tk.Entry(entry_frame, textvariable=com_id_var, font=Styles.TEXT_FONT)
+        com_id_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, pady=(2, 0))
         btn_select_product = tk.Button(entry_frame, text="选择...", font=Styles.TEXT_FONT,
                                       width=8, command=lambda: self._select_product_dialog(com_id_var),
                                       bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=2)
@@ -83,14 +85,16 @@ class PurchaseViewMixin:
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="进货单价(每斤)", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         unit_price_var = tk.StringVar()
-        tk.Entry(frame, textvariable=unit_price_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        unit_price_entry = tk.Entry(frame, textvariable=unit_price_var, font=Styles.TEXT_FONT)
+        unit_price_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 进货数量
         frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="进货数量", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         quantity_var = tk.StringVar()
-        tk.Entry(frame, textvariable=quantity_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        quantity_entry = tk.Entry(frame, textvariable=quantity_var, font=Styles.TEXT_FONT)
+        quantity_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 进货单位
         frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
@@ -131,41 +135,54 @@ class PurchaseViewMixin:
 
         def submit():
             try:
+                errors = []
+                result = validate_required(com_id_var.get(), "商品编号")
+                if not result: errors.append(result.error_message); highlight_entry_error(com_id_entry)
+                else: clear_entry_highlight(com_id_entry)
+                result = validate_numeric(unit_price_var.get(), "进货单价", min_val=0)
+                if not result: errors.append(result.error_message); highlight_entry_error(unit_price_entry)
+                else: clear_entry_highlight(unit_price_entry)
+                result = validate_numeric(quantity_var.get(), "进货数量", min_val=0)
+                if not result: errors.append(result.error_message); highlight_entry_error(quantity_entry)
+                else: clear_entry_highlight(quantity_entry)
+
+                if errors:
+                    messagebox.showwarning("输入校验", "\n".join(errors))
+                    return
+
                 com_id = com_id_var.get().strip()
-                
-                if not com_id:
-                    messagebox.showerror("错误", "请选择或输入商品编号")
-                    return
-                
-                commodity = self.system.excel_manager.get_commodity_by_id(com_id)
-                if commodity is None:
-                    messagebox.showerror("错误", "商品不存在，请先添加商品")
-                    return
-                
                 unit_price = float(unit_price_var.get())
                 quantity = float(quantity_var.get())
                 unit = unit_var.get().strip() or "斤"
                 supplier = supplier_var.get().strip()
                 stock_date = stock_date_var.get().strip() or datetime.now().strftime("%Y-%m-%d")
                 remarks = remarks_var.get().strip()
-                
-                # 自动生成进货编号
-                stock_id = self.system.excel_manager.generate_id("I", "进货记录", "进货编号")
-                from stock_record import StockRecord
-                stock_record = StockRecord(
-                    stock_id=stock_id,
-                    com_id=com_id,
-                    com_name=commodity['商品名称'],
-                    quantity=quantity,
-                    unit_price=unit_price,
-                    supplier=supplier,
-                    stock_date=stock_date,
-                    remarks=remarks,
-                    stock_unit=unit
+
+                commodity_before = self.system.excel_manager.get_commodity_by_id(com_id)
+                stock_before = float(commodity_before['当前库存']) if commodity_before else 0
+                cost_before = float(commodity_before['成本价']) if commodity_before and pd.notna(commodity_before['成本价']) else 0
+
+                result = self.system.create_stock_record_business(
+                    com_id=com_id, unit_price=unit_price, quantity=quantity,
+                    unit=unit, supplier=supplier, stock_date=stock_date, remarks=remarks
                 )
-                
-                self.system.excel_manager.add_stock(stock_record.to_list())
-                
+
+                if not result['success']:
+                    messagebox.showerror("错误", result['message'])
+                    return
+
+                stock_id = result['stock_id']
+                commodity_name = commodity_before['商品名称'] if commodity_before else com_id
+                stock_data = [stock_id, com_id, commodity_name, quantity, unit_price,
+                              supplier, stock_date, remarks, unit]
+                self.undo_manager.record_action(
+                    f"进货入库：{commodity_name} {quantity}{unit}",
+                    undo_func=lambda sid=stock_id, cid=com_id, sb=stock_before, cb=cost_before:
+                        self._undo_stock_in(sid, cid, sb, cb),
+                    redo_func=lambda sd=stock_data: self._redo_stock_in(sd)
+                )
+                self._update_status_bar()
+
                 messagebox.showinfo("成功", f"进货入库成功！\n进货编号: {stock_id}")
                 top.destroy()
             except ValueError as e:
@@ -192,3 +209,13 @@ class PurchaseViewMixin:
         """查看所有进货记录"""
         df = self.system.excel_manager.get_all_stocks()
         self.show_dataframe_window(df, "进货记录列表")
+
+    def _undo_stock_in(self, stock_id, com_id, stock_before, cost_before):
+        self.system.excel_manager.delete_record("进货记录", stock_id, "进货编号")
+        self.system.excel_manager.update_commodity(com_id, {
+            '当前库存': stock_before,
+            '成本价': cost_before
+        })
+
+    def _redo_stock_in(self, stock_data):
+        self.system.excel_manager.add_stock(list(stock_data))

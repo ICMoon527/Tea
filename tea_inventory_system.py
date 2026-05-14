@@ -5,149 +5,12 @@ from stock_record import StockRecord
 from supplier import Supplier
 from customer import Customer
 from data_visualization import DataVisualization
+from shopping_cart import ShoppingCart
 from utils import convert_to_jin
 from datetime import datetime, timedelta
 import pandas as pd
 from prettytable import PrettyTable
 import textwrap
-
-
-class ShoppingCart:
-    """Shopping cart management class"""
-    
-    def __init__(self, excel_manager):
-        self.excel_manager = excel_manager
-        self.items = []
-    
-    def add_item(self, com_id: str, quantity: float, unit: str) -> dict:
-        commodity = self.excel_manager.get_commodity_by_id(com_id)
-        if commodity is None:
-            return {'success': False, 'message': 'Product not found'}
-        
-        available_stock = float(commodity['当前库存'])
-        quantity_in_jin = convert_to_jin(quantity, unit)
-        
-        if quantity_in_jin > available_stock:
-            msg = 'Insufficient stock! Available: ' + str(available_stock) + ' jin'
-            return {'success': False, 'message': msg}
-        
-        cost_price = float(commodity['成本价']) if pd.notna(commodity['成本价']) else 0.0
-        subtotal_cost = self._calculate_subtotal(quantity, unit, cost_price)
-        
-        for item in self.items:
-            if item['商品编号'] == com_id:
-                item['购买数量'] = quantity
-                item['购买单位'] = unit
-                item['小计'] = self._calculate_subtotal(quantity, unit, float(commodity['零售价']))
-                item['成本价(每斤)'] = cost_price
-                item['成本小计'] = subtotal_cost
-                return {'success': True, 'message': 'Cart updated'}
-        
-        cart_item = {
-            '商品编号': com_id,
-            '商品名称': commodity['商品名称'],
-            '单价(每斤)': float(commodity['零售价']),
-            '成本价(每斤)': cost_price,
-            '购买数量': quantity,
-            '购买单位': unit,
-            '小计': self._calculate_subtotal(quantity, unit, float(commodity['零售价'])),
-            '成本小计': subtotal_cost
-        }
-        
-        self.items.append(cart_item)
-        return {'success': True, 'message': 'Added to cart'}
-    
-    def _calculate_subtotal(self, quantity: float, unit: str, unit_price: float) -> float:
-        if unit == '斤':
-            return quantity * unit_price
-        else:
-            return (quantity / 500) * unit_price
-    
-    def remove_item(self, com_id: str) -> bool:
-        for i, item in enumerate(self.items):
-            if item['商品编号'] == com_id:
-                self.items.pop(i)
-                return True
-        return False
-    
-    def clear(self):
-        self.items.clear()
-    
-    def is_empty(self):
-        return len(self.items) == 0
-    
-    def get_total_amount(self) -> float:
-        return sum(item['小计'] for item in self.items)
-    
-    def get_total_cost(self) -> float:
-        return sum(item.get('成本小计', 0.0) for item in self.items)
-    
-    def get_items(self) -> list:
-        return self.items.copy()
-    
-    def update_item_quantity(self, com_id, new_quantity, new_unit=None):
-        for item in self.items:
-            if item['商品编号'] == com_id:
-                commodity = self.excel_manager.get_commodity_by_id(com_id)
-                if commodity is None:
-                    return {'success': False, 'message': 'Product not found'}
-                
-                unit_to_use = new_unit if new_unit is not None else item['购买单位']
-                quantity_in_jin = convert_to_jin(new_quantity, unit_to_use)
-                available_stock = float(commodity['当前库存'])
-                
-                if quantity_in_jin > available_stock:
-                    msg = 'Insufficient stock! Available: ' + str(available_stock) + ' jin'
-                    return {'success': False, 'message': msg}
-                
-                cost_price = float(commodity['成本价']) if pd.notna(commodity['成本价']) else 0.0
-                item['购买数量'] = new_quantity
-                item['购买单位'] = unit_to_use
-                item['小计'] = self._calculate_subtotal(new_quantity, unit_to_use, float(commodity['零售价']))
-                item['成本价(每斤)'] = cost_price
-                item['成本小计'] = self._calculate_subtotal(new_quantity, unit_to_use, cost_price)
-                return {'success': True, 'message': 'Quantity updated'}
-        
-        return {'success': False, 'message': 'Item not found in cart'}
-    
-    def checkout(self, customer_name, received_amount):
-        total_amount = self.get_total_amount()
-        
-        if received_amount < total_amount and total_amount > 0:
-            discount_ratio = received_amount / total_amount
-        else:
-            discount_ratio = 1.0
-        
-        from sale_record import SaleRecord
-        
-        for item in self.items:
-            sale_id = self.excel_manager.generate_id('S', '销售记录', '销售编号')
-            quantity_in_jin = convert_to_jin(item['购买数量'], item['购买单位'])
-            item_received_amount = item['小计'] * discount_ratio
-            
-            sale_record = SaleRecord(
-                sale_id=sale_id,
-                com_id=item['商品编号'],
-                com_name=item['商品名称'],
-                quantity=quantity_in_jin,
-                unit_price=item['单价(每斤)'],
-                total_amount=item['小计'],
-                received_amount=item_received_amount,
-                customer_name=customer_name,
-                sale_unit=item['购买单位']
-            )
-            self.excel_manager.add_sale(sale_record.to_list())
-        
-        self.clear()
-        
-        discount = total_amount - received_amount if received_amount < total_amount else 0
-        return {
-            'success': True,
-            'total_amount': total_amount,
-            'received_amount': received_amount,
-            'change': received_amount - total_amount,
-            'discount_amount': discount
-        }
 
 
 class TeaInventorySystem:
@@ -1579,3 +1442,306 @@ class TeaInventorySystem:
         for key, value in sale.items():
             table.add_row([key, value])
         print(table)
+
+    # ==================== 纯业务方法（可供 CLI 和 GUI 共用） ====================
+
+    def add_commodity_business(self, com_id_input, tea_category, variety, company, origin,
+                               name, specification, cost_price, retail_price, current_stock,
+                               production_date, shelf_life, quality_features, year, grade, unit):
+        if com_id_input:
+            existing = self.excel_manager.get_commodity_by_id(com_id_input)
+            if existing is not None:
+                return {'success': False, 'message': '该商品编号已存在！'}
+            com_id = com_id_input
+        else:
+            com_id = self.excel_manager.generate_id("C", "商品信息", "商品编号")
+
+        commodity = TeaCommodity(
+            com_id=com_id, tea_category=tea_category, variety=variety,
+            company=company, origin=origin, name=name,
+            specification=specification, cost_price=cost_price,
+            retail_price=retail_price, production_date=production_date,
+            shelf_life=shelf_life, current_stock=current_stock,
+            quality_features=quality_features, year=year, grade=grade, unit=unit
+        )
+        self.excel_manager.add_commodity(commodity.to_list())
+        return {'success': True, 'message': '商品添加成功！', 'com_id': com_id}
+
+    def checkout_process(self, customer_name, received_amount):
+        return self.shopping_cart.checkout(customer_name, received_amount)
+
+    def create_stock_record_business(self, com_id, unit_price, quantity, unit, supplier,
+                                     stock_date, remarks):
+        commodity = self.excel_manager.get_commodity_by_id(com_id)
+        if commodity is None:
+            return {'success': False, 'message': '商品不存在，请先添加商品'}
+
+        stock_id = self.excel_manager.generate_id("I", "进货记录", "进货编号")
+        stock_record = StockRecord(
+            stock_id=stock_id, com_id=com_id, com_name=commodity['商品名称'],
+            quantity=quantity, unit_price=unit_price, supplier=supplier,
+            stock_date=stock_date, remarks=remarks, stock_unit=unit
+        )
+        self.excel_manager.add_stock(stock_record.to_list())
+        return {'success': True, 'message': '进货记录已保存', 'stock_id': stock_id}
+
+    def add_supplier_business(self, supplier_id_input, name, contact_person, phone, address, remarks):
+        if supplier_id_input:
+            supplier_id = supplier_id_input
+            df = self.excel_manager.get_all_suppliers()
+            if not df.empty:
+                existing = df[df['供应商编号'] == supplier_id]
+                if not existing.empty:
+                    return {'success': False, 'message': '该供应商编号已存在！'}
+        else:
+            supplier_id = self.excel_manager.generate_id("SP", "供应商", "供应商编号")
+
+        supplier = Supplier(
+            supplier_id=supplier_id, name=name, contact_person=contact_person,
+            phone=phone, address=address, remarks=remarks
+        )
+        self.excel_manager.add_supplier(supplier.to_list())
+        return {'success': True, 'message': '供应商添加成功！', 'supplier_id': supplier_id}
+
+    def update_supplier_business(self, supplier_id, updates):
+        df = self.excel_manager.get_all_suppliers()
+        if df.empty:
+            return {'success': False, 'message': '暂无供应商信息'}
+
+        idx_list = df[df['供应商编号'] == supplier_id].index
+        if len(idx_list) == 0:
+            return {'success': False, 'message': '未找到该供应商'}
+
+        for key, value in updates.items():
+            if value:
+                df.at[idx_list[0], key] = value
+
+        self.excel_manager.write_sheet("供应商", df)
+        return {'success': True, 'message': '供应商信息更新成功！'}
+
+    def delete_supplier_business(self, supplier_id):
+        df = self.excel_manager.get_all_suppliers()
+        if df.empty:
+            return {'success': False, 'message': '暂无供应商信息'}
+
+        supplier_row = df[df['供应商编号'] == supplier_id]
+        if supplier_row.empty:
+            return {'success': False, 'message': '未找到该供应商'}
+
+        supplier_name = supplier_row.iloc[0]['供应商名称']
+        new_df = df[df['供应商编号'] != supplier_id]
+        self.excel_manager.write_sheet("供应商", new_df)
+        return {'success': True, 'message': '供应商删除成功！', 'name': supplier_name}
+
+    def add_customer_business(self, customer_id_input, name, phone, email, address, remarks):
+        if customer_id_input:
+            customer_id = customer_id_input
+            existing = self.excel_manager.get_customer_by_id(customer_id)
+            if existing is not None:
+                return {'success': False, 'message': '该客户编号已存在！'}
+        else:
+            customer_id = self.excel_manager.generate_id("K", "客户信息", "客户编号")
+
+        customer = Customer(
+            customer_id=customer_id, name=name, phone=phone, email=email,
+            address=address, remarks=remarks
+        )
+        customer.update_customer_level()
+        self.excel_manager.add_customer(customer.to_list())
+        return {'success': True, 'message': '客户添加成功！', 'customer_id': customer_id,
+                'customer_level': customer.customer_level}
+
+    def update_customer_business(self, customer_id, updates):
+        all_customers = self.excel_manager.get_all_customers()
+        if all_customers.empty:
+            return {'success': False, 'message': '暂无客户信息'}
+
+        idx_list = all_customers[all_customers['客户编号'] == customer_id].index
+        if len(idx_list) == 0:
+            return {'success': False, 'message': '未找到该客户'}
+
+        for key, value in updates.items():
+            all_customers.at[idx_list[0], key] = value
+
+        total_purchases = updates.get('累计消费', all_customers.at[idx_list[0], '累计消费'])
+        if float(total_purchases) >= 10000:
+            customer_level = "VIP客户"
+        elif float(total_purchases) >= 5000:
+            customer_level = "高级客户"
+        elif float(total_purchases) >= 2000:
+            customer_level = "中级客户"
+        else:
+            customer_level = "普通客户"
+        all_customers.at[idx_list[0], '客户等级'] = customer_level
+
+        self.excel_manager.write_sheet("客户", all_customers)
+        return {'success': True, 'message': '客户信息更新成功！'}
+
+    def delete_customer_business(self, customer_id):
+        all_customers = self.excel_manager.get_all_customers()
+        if all_customers.empty:
+            return {'success': False, 'message': '暂无客户信息'}
+
+        customer_row = all_customers[all_customers['客户编号'] == customer_id]
+        if customer_row.empty:
+            return {'success': False, 'message': '未找到该客户'}
+
+        customer_name = customer_row.iloc[0]['客户名称']
+        new_df = all_customers[all_customers['客户编号'] != customer_id]
+        self.excel_manager.write_sheet("客户", new_df)
+        return {'success': True, 'message': '客户删除成功！', 'name': customer_name}
+
+    def get_sales_statistics_data(self, dimension=None):
+        df = self.excel_manager.get_all_sales(include_voided=False)
+        if df.empty:
+            return None
+
+        commodity_df = self.excel_manager.get_all_commodities()
+        if commodity_df.empty:
+            return None
+
+        commodity_df['成本价'] = pd.to_numeric(commodity_df['成本价'], errors='coerce')
+        merged_df = pd.merge(df, commodity_df[['商品编号', '茶类', '品种', '成本价']],
+                           on='商品编号', how='left')
+
+        units = merged_df.get('销售单位', pd.Series(['斤'] * len(merged_df), index=merged_df.index))
+        unit_multiplier = units.map(lambda x: 1/500 if x == '克' else 1)
+        merged_df['销售数量(斤)'] = merged_df['销售数量'] * unit_multiplier
+        merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
+        merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
+
+        total_income = merged_df['实收金额'].sum()
+        total_cost = merged_df['销售成本'].sum()
+        total_profit = merged_df['利润'].sum()
+        total_quantity = merged_df['销售数量(斤)'].sum()
+
+        summary = {
+            'total_sales_count': len(df),
+            'total_income': total_income,
+            'total_cost': total_cost,
+            'total_profit': total_profit,
+            'profit_margin': (total_profit / total_income * 100) if total_income > 0 else 0,
+            'total_quantity': total_quantity,
+            'merged_df': merged_df
+        }
+
+        if dimension is None:
+            return summary
+
+        if dimension == '茶类' and '茶类' in merged_df.columns:
+            stats = merged_df.groupby('茶类').agg({
+                '销售数量(斤)': 'sum', '实收金额': 'sum',
+                '销售成本': 'sum', '利润': 'sum'
+            }).round(2)
+            stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
+            return stats.reset_index()
+
+        elif dimension == '品种' and '品种' in merged_df.columns:
+            stats = merged_df.groupby('品种').agg({
+                '销售数量(斤)': 'sum', '实收金额': 'sum',
+                '销售成本': 'sum', '利润': 'sum'
+            }).round(2)
+            stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
+            return stats.reset_index()
+
+        elif dimension == '商品' and '商品名称' in merged_df.columns:
+            stats = merged_df.groupby(['商品编号', '商品名称']).agg({
+                '销售数量(斤)': 'sum', '实收金额': 'sum',
+                '销售成本': 'sum', '利润': 'sum'
+            }).round(2)
+            stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
+            return stats.reset_index()
+
+        return summary
+
+    def get_sales_statistics_by_time_data(self, time_unit):
+        df = self.excel_manager.get_all_sales(include_voided=False)
+        if df.empty:
+            return None
+
+        df['销售日期'] = pd.to_datetime(df['销售日期'], errors='coerce')
+
+        units = df.get('销售单位', pd.Series(['斤'] * len(df), index=df.index))
+        unit_multiplier = units.map(lambda x: 1/500 if x == '克' else 1)
+        df['销售数量(斤)'] = df['销售数量'] * unit_multiplier
+
+        commodity_df = self.excel_manager.get_all_commodities()
+        if not commodity_df.empty:
+            merged_df = pd.merge(df, commodity_df[['商品编号', '成本价']],
+                               on='商品编号', how='left')
+            merged_df['销售成本'] = merged_df['销售数量(斤)'] * pd.to_numeric(merged_df['成本价'], errors='coerce')
+            merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
+        else:
+            merged_df = df
+            merged_df['销售成本'] = 0
+            merged_df['利润'] = merged_df['实收金额']
+
+        if time_unit == '日':
+            grouped = merged_df.groupby(merged_df['销售日期'].dt.date)
+        elif time_unit == '周':
+            grouped = merged_df.groupby(merged_df['销售日期'].dt.to_period('W'))
+        elif time_unit == '月':
+            grouped = merged_df.groupby(merged_df['销售日期'].dt.to_period('M'))
+        else:
+            return None
+
+        stats = grouped.agg({
+            '销售数量(斤)': 'sum', '实收金额': 'sum',
+            '销售成本': 'sum', '利润': 'sum'
+        }).round(2)
+        stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
+        return stats.reset_index()
+
+    def get_top_selling_products_data(self):
+        df = self.excel_manager.get_all_sales(include_voided=False)
+        if df.empty:
+            return None
+
+        units = df.get('销售单位', pd.Series(['斤'] * len(df), index=df.index))
+        unit_multiplier = units.map(lambda x: 1/500 if x == '克' else 1)
+        df['销售数量(斤)'] = df['销售数量'] * unit_multiplier
+
+        stats = df.groupby(['商品编号', '商品名称']).agg({
+            '销售数量(斤)': 'sum', '实收金额': 'sum'
+        }).round(2)
+        stats = stats.sort_values(by='销售数量(斤)', ascending=False).head(10)
+        return stats.reset_index()
+
+    def get_profit_analysis_data(self):
+        df = self.excel_manager.get_all_sales(include_voided=False)
+        if df.empty:
+            return None
+
+        commodity_df = self.excel_manager.get_all_commodities()
+        if commodity_df.empty:
+            return None
+
+        commodity_df['成本价'] = pd.to_numeric(commodity_df['成本价'], errors='coerce')
+        merged_df = pd.merge(df, commodity_df[['商品编号', '成本价']],
+                           on='商品编号', how='left')
+
+        units = merged_df.get('销售单位', pd.Series(['斤'] * len(merged_df), index=merged_df.index))
+        unit_multiplier = units.map(lambda x: 1/500 if x == '克' else 1)
+        merged_df['销售数量(斤)'] = merged_df['销售数量'] * unit_multiplier
+        merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
+        merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
+
+        total_income = merged_df['实收金额'].sum()
+        total_cost = merged_df['销售成本'].sum()
+        total_profit = merged_df['利润'].sum()
+        profit_margin = (total_profit / total_income * 100) if total_income > 0 else 0
+
+        product_profit = merged_df.groupby(['商品编号', '商品名称']).agg({
+            '销售数量(斤)': 'sum', '实收金额': 'sum',
+            '销售成本': 'sum', '利润': 'sum'
+        }).round(2)
+        product_profit['利润率(%)'] = (product_profit['利润'] / product_profit['实收金额'] * 100).round(2)
+        product_profit = product_profit.sort_values(by='利润', ascending=False)
+
+        return {
+            'total_income': total_income,
+            'total_cost': total_cost,
+            'total_profit': total_profit,
+            'profit_margin': profit_margin,
+            'product_profit': product_profit.reset_index()
+        }

@@ -2,6 +2,7 @@ import pandas as pd
 from typing import Optional, List, Dict
 from datetime import datetime
 import os
+from logger import get_logger
 
 
 class DataExporter:
@@ -14,6 +15,7 @@ class DataExporter:
     }
     
     def __init__(self, excel_manager):
+        self.logger = get_logger()
         self.excel_manager = excel_manager
     
     def export_commodities(
@@ -43,7 +45,7 @@ class DataExporter:
             
             return self._export_dataframe(df, export_path, format)
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"导出商品数据失败: {e}")
+            self.logger.error(f"导出商品数据失败: {e}")
             return False
     
     def export_sales(
@@ -75,7 +77,7 @@ class DataExporter:
             
             return self._export_dataframe(df, export_path, format)
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"导出销售数据失败: {e}")
+            self.logger.error(f"导出销售数据失败: {e}")
             return False
     
     def export_stocks(
@@ -107,7 +109,7 @@ class DataExporter:
             
             return self._export_dataframe(df, export_path, format)
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"导出进货数据失败: {e}")
+            self.logger.error(f"导出进货数据失败: {e}")
             return False
     
     def export_suppliers(
@@ -128,7 +130,7 @@ class DataExporter:
             df = self.excel_manager.get_all_suppliers()
             return self._export_dataframe(df, export_path, format)
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"导出供应商数据失败: {e}")
+            self.logger.error(f"导出供应商数据失败: {e}")
             return False
     
     def export_customers(
@@ -149,7 +151,7 @@ class DataExporter:
             df = self.excel_manager.get_all_customers()
             return self._export_dataframe(df, export_path, format)
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"导出客户数据失败: {e}")
+            self.logger.error(f"导出客户数据失败: {e}")
             return False
     
     def export_statistics(
@@ -171,7 +173,7 @@ class DataExporter:
         try:
             return self._export_dataframe(statistics_data, export_path, format)
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"导出统计数据失败: {e}")
+            self.logger.error(f"导出统计数据失败: {e}")
             return False
     
     def export_all_data(
@@ -251,7 +253,7 @@ class DataExporter:
             
             return True
         except (FileNotFoundError, PermissionError, ValueError, KeyError, OSError) as e:
-            print(f"导出数据失败: {e}")
+            self.logger.error(f"导出数据失败: {e}")
             return False
     
     def _get_extension(self, format: str) -> str:

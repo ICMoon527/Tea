@@ -5,13 +5,16 @@ import hashlib
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pathlib import Path
+from logger import get_logger
+
+_logger = get_logger()
 
 try:
     import paramiko
     PARAMIKO_AVAILABLE = True
 except ImportError:
     PARAMIKO_AVAILABLE = False
-    print("警告: paramiko 库未安装，SFTP 功能不可用")
+    _logger.warning("paramiko 库未安装，SFTP 功能不可用")
 
 
 class CloudSyncManager:
@@ -21,6 +24,7 @@ class CloudSyncManager:
     """
     
     def __init__(self, config_file: str = "cloud_sync_config.json"):
+        self.logger = get_logger()
         self.config_file = config_file
         self.config = self._load_config()
         self.ssh_client = None
@@ -71,7 +75,7 @@ class CloudSyncManager:
                 json.dump(self.config, f, ensure_ascii=False, indent=2)
             return True
         except (json.JSONDecodeError, FileNotFoundError, PermissionError, OSError) as e:
-            print(f"保存同步配置失败: {e}")
+            self.logger.error(f"保存同步配置失败: {e}")
             return False
     
     def _generate_device_id(self) -> str:
@@ -89,7 +93,7 @@ class CloudSyncManager:
                     sha256_hash.update(byte_block)
             return sha256_hash.hexdigest()
         except (FileNotFoundError, PermissionError, OSError) as e:
-            print(f"计算文件哈希失败: {e}")
+            self.logger.error(f"计算文件哈希失败: {e}")
             return ""
     
     def is_enabled(self) -> bool:
@@ -107,7 +111,7 @@ class CloudSyncManager:
                          password: str, remote_path: str) -> bool:
         """设置服务器配置"""
         if not PARAMIKO_AVAILABLE:
-            print("错误: paramiko 库未安装")
+            self.logger.error("paramiko 库未安装")
             return False
         
         self.config["server"] = {
@@ -168,7 +172,7 @@ class CloudSyncManager:
             return True
             
         except Exception as e:
-            print(f"连接服务器失败: {e}")
+            self.logger.error(f"连接服务器失败: {e}")
             self._disconnect()
             return False
     
@@ -204,13 +208,13 @@ class CloudSyncManager:
                 try:
                     self.sftp_client.mkdir(remote_path)
                 except Exception as e:
-                    print(f"创建远程目录失败: {e}")
+                    self.logger.error(f"创建远程目录失败: {e}")
                     return False
             
             return True
             
         except Exception as e:
-            print(f"检查远程路径失败: {e}")
+            self.logger.error(f"检查远程路径失败: {e}")
             return False
     
     def upload_to_cloud(self, data_files: List[str]) -> Dict[str, Any]:
@@ -253,9 +257,9 @@ class CloudSyncManager:
                         
                         self.sftp_client.put(local_file, remote_file)
                         uploaded_files.append(file_name)
-                        print(f"成功上传: {file_name}")
+                        self.logger.info(f"成功上传: {file_name}")
                     except Exception as e:
-                        print(f"上传文件 {local_file} 失败: {e}")
+                        self.logger.error(f"上传文件 {local_file} 失败: {e}")
             
             if uploaded_files:
                 self.config["data_version"] = self.config.get("data_version", 0) + 1
@@ -305,10 +309,10 @@ class CloudSyncManager:
                 packages.sort(key=lambda x: x['modified_time'], reverse=True)
                 
             except Exception as e:
-                print(f"列出远程文件失败: {e}")
+                self.logger.error(f"列出远程文件失败: {e}")
             
         except Exception as e:
-            print(f"获取云端文件列表失败: {e}")
+            self.logger.error(f"获取云端文件列表失败: {e}")
         finally:
             self._disconnect()
         
@@ -359,9 +363,9 @@ class CloudSyncManager:
                             
                             self.sftp_client.get(remote_file, local_file)
                             restored_files.append(file_name)
-                            print(f"成功下载: {file_name}")
+                            self.logger.info(f"成功下载: {file_name}")
                         except Exception as e:
-                            print(f"下载文件 {file_name} 失败: {e}")
+                            self.logger.error(f"下载文件 {file_name} 失败: {e}")
                 
                 if restored_files:
                     self.config["last_sync_time"] = datetime.now().isoformat()

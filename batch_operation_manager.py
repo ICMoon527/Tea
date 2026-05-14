@@ -378,3 +378,59 @@ class BatchOperationManager:
             )
         
         return results
+    
+    def download_import_template(self):
+        import tkinter.filedialog as filedialog
+        import tkinter.messagebox as messagebox
+        
+        file_path = filedialog.asksaveasfilename(
+            title="保存导入模板",
+            defaultextension=".xlsx",
+            filetypes=[("Excel文件", "*.xlsx")],
+            initialfile="商品批量导入模板.xlsx"
+        )
+        
+        if not file_path:
+            return
+        
+        template_df = pd.DataFrame(columns=[
+            "茶类", "品种", "商品名称", "规格", "单位",
+            "成本价", "零售价", "初始库存", "保质期(月)", "备注"
+        ])
+        
+        example_row = {
+            "茶类": "绿茶",
+            "品种": "龙井",
+            "商品名称": "西湖龙井特级",
+            "规格": "500g",
+            "单位": "克",
+            "成本价": 80.00,
+            "零售价": 168.00,
+            "初始库存": 50,
+            "保质期(月)": 18,
+            "备注": "此为示例数据，导入前请删除此行"
+        }
+        template_df = pd.concat([template_df, pd.DataFrame([example_row])], ignore_index=True)
+        
+        with pd.ExcelWriter(file_path, engine='openpyxl') as writer:
+            template_df.to_excel(writer, sheet_name='商品数据', index=False)
+        
+            instructions = pd.DataFrame({
+                "字段": list(template_df.columns),
+                "是否必填": ["是", "是", "是", "是", "是", "是", "是", "是", "否", "否"],
+                "说明": [
+                    "如：绿茶、红茶、乌龙茶等",
+                    "如：龙井、碧螺春、铁观音等",
+                    "商品的具体名称",
+                    "如：250g、500g",
+                    "如：克、斤、盒",
+                    "进货价格，单位：元",
+                    "建议零售价格，单位：元",
+                    "当前库存数量",
+                    "单位为月，可不填",
+                    "额外备注信息，可不填"
+                ]
+            })
+            instructions.to_excel(writer, sheet_name='填写说明', index=False)
+        
+        messagebox.showinfo("成功", f"模板已保存到：{file_path}")

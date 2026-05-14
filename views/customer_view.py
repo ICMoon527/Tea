@@ -4,6 +4,10 @@ import pandas as pd
 from datetime import datetime, timedelta
 import os
 from styles import Styles
+from validators import validate_required, validate_numeric, validate_phone, highlight_entry_error, clear_entry_highlight
+from logger import get_logger
+
+_logger = get_logger()
 
 
 class CustomerViewMixin:
@@ -71,7 +75,7 @@ class CustomerViewMixin:
                         cols.insert(pos + 1, cols.pop(cols.index('累计利润')))
                         df = df[cols]
             except Exception as e:
-                print(f"计算客户累计利润时出错: {e}")
+                _logger.error(f"计算客户累计利润时出错: {e}")
         self.show_dataframe_window(df, "客户列表")
 
     def add_customer_gui(self):
@@ -115,14 +119,16 @@ class CustomerViewMixin:
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="客户名称", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         name_var = tk.StringVar()
-        tk.Entry(frame, textvariable=name_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        name_entry = tk.Entry(frame, textvariable=name_var, font=Styles.TEXT_FONT)
+        name_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 联系电话
         frame = tk.Frame(left_col, bg=Styles.BACKGROUND_COLOR)
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="联系电话", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         phone_var = tk.StringVar()
-        tk.Entry(frame, textvariable=phone_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        phone_entry = tk.Entry(frame, textvariable=phone_var, font=Styles.TEXT_FONT)
+        phone_entry.pack(fill=tk.X, pady=(2, 0))
 
         # 右列字段
         # 地址
@@ -137,41 +143,51 @@ class CustomerViewMixin:
         frame.pack(fill=tk.X, pady=4)
         tk.Label(frame, text="累计消费", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
         total_purchases_var = tk.StringVar(value="0")
-        tk.Entry(frame, textvariable=total_purchases_var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+        total_purchases_entry = tk.Entry(frame, textvariable=total_purchases_var, font=Styles.TEXT_FONT)
+        total_purchases_entry.pack(fill=tk.X, pady=(2, 0))
 
         def submit():
             try:
-                customer_id_input = customer_id_var.get().strip()
-                if customer_id_input:
-                    customer_id = customer_id_input
-                    df = self.system.excel_manager.get_all_customers()
-                    if not df.empty:
-                        existing = df[df['客户编号'] == customer_id]
-                        if not existing.empty:
-                            messagebox.showerror("错误", "该客户编号已存在！")
-                            return
-                else:
-                    customer_id = self.system.excel_manager.generate_id("CU", "客户", "客户编号")
+                errors = []
+                result = validate_required(name_var.get(), "客户名称")
+                if not result: errors.append(result.error_message); highlight_entry_error(name_entry)
+                else: clear_entry_highlight(name_entry)
+                result = validate_phone(phone_var.get(), "联系电话")
+                if not result: errors.append(result.error_message); highlight_entry_error(phone_entry)
+                else: clear_entry_highlight(phone_entry)
+                result = validate_numeric(total_purchases_var.get(), "累计消费", min_val=0)
+                if not result: errors.append(result.error_message); highlight_entry_error(total_purchases_entry)
+                else: clear_entry_highlight(total_purchases_entry)
 
+                if errors:
+                    messagebox.showwarning("输入校验", "\n".join(errors))
+                    return
+
+                customer_id_input = customer_id_var.get().strip()
                 name = name_var.get().strip()
                 phone = phone_var.get().strip()
                 address = address_var.get().strip()
                 total_purchases = float(total_purchases_var.get())
 
-                from customer import Customer
-                customer = Customer(
-                    customer_id=customer_id,
-                    name=name,
-                    phone=phone,
-                    address=address,
-                    total_purchases=total_purchases
+                result = self.system.add_customer_business(
+                    customer_id_input=customer_id_input, name=name, phone=phone,
+                    email="", address=address, remarks=""
                 )
 
-                # 自动计算客户等级
-                customer.update_customer_level()
+                if not result['success']:
+                    messagebox.showerror("错误", result['message'])
+                    return
 
-                self.system.excel_manager.add_customer(customer.to_list())
-                messagebox.showinfo("成功", f"客户添加成功！\n客户编号: {customer_id}\n客户等级: {customer.customer_level}")
+                new_customer_id = result['customer_id']
+                customer_data = [new_customer_id, name, phone, "", address, 0.0, 0, "", result.get('customer_level', '普通客户'), "", datetime.now().strftime("%Y-%m-%d")]
+                self.undo_manager.record_action(
+                    f"添加客户：{name}",
+                    undo_func=lambda cid=new_customer_id: self.system.excel_manager.delete_record("客户信息", cid, "客户编号"),
+                    redo_func=lambda cd=customer_data: self.system.excel_manager.append_to_sheet("客户信息", cd)
+                )
+                self._update_status_bar()
+
+                messagebox.showinfo("成功", f"客户添加成功！\n客户编号: {new_customer_id}\n客户等级: {result['customer_level']}")
                 top.destroy()
             except ValueError as e:
                 messagebox.showerror("错误", f"数据输入错误: {e}")
@@ -259,6 +275,7 @@ class CustomerViewMixin:
 
             # 创建变量
             vars = {}
+            entries = {}
             
             # 左列字段
             fields_left = [
@@ -272,7 +289,9 @@ class CustomerViewMixin:
                 tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
                 var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+                entry = tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT)
+                entry.pack(fill=tk.X, pady=(2, 0))
+                entries[key] = entry
             
             # 右列字段
             fields_right = [
@@ -286,9 +305,28 @@ class CustomerViewMixin:
                 tk.Label(frame, text=label, font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR, anchor="w").pack(fill=tk.X)
                 var = tk.StringVar(value=str(value) if pd.notna(value) else "")
                 vars[key] = var
-                tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT).pack(fill=tk.X, pady=(2, 0))
+                entry = tk.Entry(frame, textvariable=var, font=Styles.TEXT_FONT)
+                entry.pack(fill=tk.X, pady=(2, 0))
+                entries[key] = entry
 
             def save():
+                errors = []
+                result = validate_required(vars["客户名称"].get(), "客户名称")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries["客户名称"])
+                else: clear_entry_highlight(entries["客户名称"])
+                result = validate_phone(vars["联系电话"].get(), "联系电话")
+                if not result: errors.append(result.error_message); highlight_entry_error(entries["联系电话"])
+                else: clear_entry_highlight(entries["联系电话"])
+                cum_val = vars["累计消费"].get().strip()
+                if cum_val:
+                    result = validate_numeric(cum_val, "累计消费", min_val=0)
+                    if not result: errors.append(result.error_message); highlight_entry_error(entries["累计消费"])
+                    else: clear_entry_highlight(entries["累计消费"])
+
+                if errors:
+                    messagebox.showwarning("输入校验", "\n".join(errors))
+                    return
+
                 updates = {}
                 for key, var in vars.items():
                     value = var.get().strip()
@@ -299,34 +337,25 @@ class CustomerViewMixin:
                             updates[key] = value
 
                 if updates:
-                    # 获取所有客户数据
-                    all_customers = self.system.excel_manager.get_all_customers()
-                    # 找到要修改的客户
-                    idx = all_customers[all_customers['客户编号'] == customer_id].index
-                    if len(idx) > 0:
-                        # 更新数据
-                        for key, value in updates.items():
-                            all_customers.at[idx[0], key] = value
-                        
-                        # 重新计算客户等级
-                        total_purchases = updates.get('累计消费', customer_row['累计消费'])
-                        if total_purchases >= 5000:
-                            customer_level = "VIP客户"
-                        elif total_purchases >= 2000:
-                            customer_level = "高级客户"
-                        elif total_purchases >= 1000:
-                            customer_level = "中级客户"
-                        else:
-                            customer_level = "普通客户"
-                        all_customers.at[idx[0], '客户等级'] = customer_level
-                        
-                        # 写回Excel
-                        self.system.excel_manager.write_sheet("客户", all_customers)
+                    old_data = {
+                        '客户名称': customer_row['客户名称'],
+                        '联系电话': customer_row['联系电话'],
+                        '地址': customer_row['地址'],
+                        '累计消费': customer_row['累计消费']
+                    }
+                    update_result = self.system.update_customer_business(customer_id, updates)
+                    if update_result['success']:
+                        self.undo_manager.record_action(
+                            f"修改客户：{customer_row['客户名称']}",
+                            undo_func=lambda cid=customer_id, old=dict(old_data): self.system.update_customer_business(cid, old),
+                            redo_func=lambda cid=customer_id, upd=dict(updates): self.system.update_customer_business(cid, upd)
+                        )
+                        self._update_status_bar()
                         messagebox.showinfo("成功", "客户信息更新成功！")
                         edit_top.destroy()
                         top.destroy()
                     else:
-                        messagebox.showerror("错误", "更新失败！")
+                        messagebox.showerror("错误", update_result['message'])
                 else:
                     messagebox.showinfo("提示", "未做任何修改。")
 
@@ -383,23 +412,31 @@ class CustomerViewMixin:
 
         def delete():
             customer_id = customer_id_var.get().strip()
-            df = self.system.excel_manager.get_all_customers()
-            if df.empty:
+            all_customers = self.system.excel_manager.get_all_customers()
+            if all_customers.empty:
                 messagebox.showerror("错误", "未找到客户信息")
                 return
 
-            customer = df[df['客户编号'] == customer_id]
-            if customer.empty:
+            customer_row = all_customers[all_customers['客户编号'] == customer_id]
+            if customer_row.empty:
                 messagebox.showerror("错误", "未找到该客户")
                 return
 
-            customer_row = customer.iloc[0]
-            if messagebox.askyesno("确认", f"确定要删除客户 '{customer_row['客户名称']}' 吗？"):
-                # 删除客户
-                new_df = df[df['客户编号'] != customer_id]
-                self.system.excel_manager.write_sheet("客户", new_df)
-                messagebox.showinfo("成功", "客户删除成功！")
-                top.destroy()
+            if messagebox.askyesno("确认", f"确定要删除客户 '{customer_row.iloc[0]['客户名称']}' 吗？"):
+                customer_name = customer_row.iloc[0]['客户名称']
+                saved_row = customer_row.iloc[0].to_list()
+                result = self.system.delete_customer_business(customer_id)
+                if result['success']:
+                    self.undo_manager.record_action(
+                        f"删除客户：{customer_name}",
+                        undo_func=lambda sd=list(saved_row): self.system.excel_manager.append_to_sheet("客户信息", sd),
+                        redo_func=lambda cid=customer_id: self.system.delete_customer_business(cid)
+                    )
+                    self._update_status_bar()
+                    messagebox.showinfo("成功", "客户删除成功！")
+                    top.destroy()
+                else:
+                    messagebox.showerror("错误", result['message'])
 
         btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         btn_frame.pack(pady=Styles.PADY_MEDIUM)

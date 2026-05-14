@@ -1,9 +1,12 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk, messagebox, simpledialog
 import pandas as pd
 from datetime import datetime, timedelta
 import os
 from styles import Styles
+from validators import validate_required, validate_numeric, validate_integer, highlight_entry_error, clear_entry_highlight
+from sale_record import SaleRecord
+from utils import convert_to_jin
 
 
 class SalesViewMixin:
@@ -110,7 +113,8 @@ class SalesViewMixin:
                 serial_frame.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
                 tk.Label(serial_frame, text="商品序号: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack()
                 choice_var = tk.StringVar()
-                tk.Entry(serial_frame, textvariable=choice_var, width=10, font=Styles.TEXT_FONT).pack()
+                choice_entry = tk.Entry(serial_frame, textvariable=choice_var, width=10, font=Styles.TEXT_FONT)
+                choice_entry.pack()
                 
                 # 购买数量
                 quantity_frame = tk.Frame(input_row_frame, bg=Styles.BACKGROUND_COLOR)
@@ -132,6 +136,18 @@ class SalesViewMixin:
                 
                 def add_to_cart():
                     try:
+                        errors = []
+                        result = validate_integer(choice_var.get(), "商品序号", min_val=1)
+                        if not result: errors.append(result.error_message); highlight_entry_error(choice_entry)
+                        else: clear_entry_highlight(choice_entry)
+                        result = validate_numeric(quantity_var.get(), "购买数量", min_val=0)
+                        if not result: errors.append(result.error_message); highlight_entry_error(quantity_entry)
+                        else: clear_entry_highlight(quantity_entry)
+
+                        if errors:
+                            messagebox.showwarning("输入校验", "\n".join(errors))
+                            return
+
                         choice = int(choice_var.get()) - 1
                         if 0 <= choice < len(available_commodities):
                             selected_commodity = available_commodities.iloc[choice]
@@ -431,7 +447,8 @@ class SalesViewMixin:
         customer_frame = tk.Frame(input_frame, bg=Styles.BACKGROUND_COLOR)
         customer_frame.pack(pady=Styles.SPACING_XS)
         customer_var = tk.StringVar()
-        tk.Entry(customer_frame, textvariable=customer_var, width=30, font=Styles.TEXT_FONT).pack(side=tk.LEFT, padx=(0, 5))
+        customer_entry = tk.Entry(customer_frame, textvariable=customer_var, width=30, font=Styles.TEXT_FONT)
+        customer_entry.pack(side=tk.LEFT, padx=(0, 5))
         btn_select_customer = tk.Button(customer_frame, text="选择...", font=Styles.TEXT_FONT,
                                       width=8, command=lambda: self._select_customer_dialog(customer_var),
                                       bg=Styles.PRIMARY_COLOR, fg="white", relief=tk.FLAT, padx=5, pady=2)
@@ -442,59 +459,53 @@ class SalesViewMixin:
         # 实收金额
         tk.Label(input_frame, text="实收金额: ", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=Styles.SPACING_XS)
         received_var = tk.StringVar(value=str(total_amount))
-        tk.Entry(input_frame, textvariable=received_var, width=30, font=Styles.TEXT_FONT).pack(pady=Styles.SPACING_XS)
+        received_entry = tk.Entry(input_frame, textvariable=received_var, width=30, font=Styles.TEXT_FONT)
+        received_entry.pack(pady=Styles.SPACING_XS)
         
         def process_checkout():
-            customer_name = customer_var.get().strip()
-            if not customer_name:
-                messagebox.showerror("错误", "请输入客户名称")
+            errors = []
+            result = validate_required(customer_var.get(), "客户名称")
+            if not result: errors.append(result.error_message); highlight_entry_error(customer_entry)
+            else: clear_entry_highlight(customer_entry)
+            result = validate_numeric(received_var.get(), "实收金额", min_val=0)
+            if not result: errors.append(result.error_message); highlight_entry_error(received_entry)
+            else: clear_entry_highlight(received_entry)
+
+            if errors:
+                messagebox.showwarning("输入校验", "\n".join(errors))
                 return
-            
+
+            customer_name = customer_var.get().strip()
             try:
                 received_amount = float(received_var.get())
-                if received_amount < 0:
-                    messagebox.showerror("错误", "实收金额不能为负数")
-                    return
-                
                 if received_amount < total_amount:
                     if not messagebox.askyesno("确认", f"实收金额 {received_amount:.2f} 元低于应收金额 {total_amount:.2f} 元，是否继续？"):
                         return
-                
-                # 无论实收金额是高还是低，都按比例分配给每个商品
-                discount_ratio = received_amount / total_amount if total_amount > 0 else 1.0
-                
-                # 处理销售记录 - 统一以"斤"为单位
-                for item in self.system.shopping_cart.get_items():
-                    sale_id = self.system.excel_manager.generate_id("S", "销售记录", "销售编号")
-                    # 将数量转换为斤
-                    quantity_in_jin = item['购买数量'] / 500 if item['购买单位'] == "克" else item['购买数量']
-                    item_received_amount = item['小计'] * discount_ratio
-                    
-                    from sale_record import SaleRecord
-                    sale_record = SaleRecord(
-                        sale_id=sale_id,
-                        com_id=item['商品编号'],
-                        com_name=item['商品名称'],
-                        quantity=quantity_in_jin,  # 统一以斤为单位记录
-                        unit_price=item['单价(每斤)'],
-                        total_amount=item['小计'],
-                        received_amount=item_received_amount,
-                        customer_name=customer_name,
-                        sale_unit="斤"  # 统一销售单位为斤
-                    )
-                    self.system.excel_manager.add_sale(sale_record.to_list())
-                
-                # 注意：add_sale方法中已经会自动更新客户信息，不需要重复调用
-                if received_amount < total_amount:
-                    message = f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元\n折扣: {total_amount - received_amount:.2f} 元"
-                elif received_amount > total_amount:
-                    message = f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元\n溢价: {received_amount - total_amount:.2f} 元"
+
+                saved_cart_items = [dict(item) for item in cart_items]
+
+                checkout_result = self.system.checkout_process(customer_name, received_amount)
+                if not checkout_result['success']:
+                    messagebox.showerror("错误", "结账失败")
+                    return
+
+                sale_ids = checkout_result.get('sale_ids', [])
+                self.undo_manager.record_action(
+                    f"销售结账：{customer_name} {received_amount:.2f}元",
+                    undo_func=lambda sids=list(sale_ids): self._undo_checkout(sids),
+                    redo_func=lambda items=saved_cart_items, cn=customer_name, ra=received_amount:
+                        self._redo_checkout(items, cn, ra)
+                )
+                self._update_status_bar()
+
+                if checkout_result.get('discount_amount', 0) > 0:
+                    message = f"结账成功！\n应付: {checkout_result['total_amount']:.2f} 元\n实收: {checkout_result['received_amount']:.2f} 元\n折扣: {checkout_result['discount_amount']:.2f} 元"
+                elif checkout_result.get('change', 0) > 0:
+                    message = f"结账成功！\n应付: {checkout_result['total_amount']:.2f} 元\n实收: {checkout_result['received_amount']:.2f} 元\n溢价: {checkout_result['change']:.2f} 元"
                 else:
-                    message = f"结账成功！\n应付: {total_amount:.2f} 元\n实收: {received_amount:.2f} 元"
+                    message = f"结账成功！\n应付: {checkout_result['total_amount']:.2f} 元\n实收: {checkout_result['received_amount']:.2f} 元"
                 messagebox.showinfo("成功", message)
-                
-                # 清空购物车
-                self.system.shopping_cart.clear()
+
                 top.destroy()
             except ValueError:
                 messagebox.showerror("错误", "请输入有效的金额")
@@ -513,3 +524,30 @@ class SalesViewMixin:
                   width=Styles.BUTTON_WIDTH, height=Styles.BUTTON_HEIGHT, command=top.destroy,
                   bg=Styles.ERROR_COLOR, fg="white", relief=tk.FLAT, padx=10, pady=5)
         btn_cancel.pack(side=tk.LEFT, padx=Styles.SPACING_SM)
+
+    def _undo_checkout(self, sale_ids):
+        for sid in sale_ids:
+            self.system.excel_manager.void_sale(sid)
+
+    def _redo_checkout(self, cart_items, customer_name, received_amount):
+        total_amount = sum(item['小计'] for item in cart_items)
+        if received_amount < total_amount and total_amount > 0:
+            discount_ratio = received_amount / total_amount
+        else:
+            discount_ratio = 1.0
+        for item in cart_items:
+            sale_id = self.system.excel_manager.generate_id('S', '销售记录', '销售编号')
+            quantity_in_jin = convert_to_jin(item['购买数量'], item['购买单位'])
+            item_received_amount = item['小计'] * discount_ratio
+            sale_record = SaleRecord(
+                sale_id=sale_id,
+                com_id=item['商品编号'],
+                com_name=item['商品名称'],
+                quantity=quantity_in_jin,
+                unit_price=item['单价(每斤)'],
+                total_amount=item['小计'],
+                received_amount=item_received_amount,
+                customer_name=customer_name,
+                sale_unit=item['购买单位']
+            )
+            self.system.excel_manager.add_sale(sale_record.to_list())

@@ -316,70 +316,19 @@ class StatsViewMixin:
     def statistics_by_dimension(self, dimension):
         """按维度统计"""
         try:
-            df = self.system.excel_manager.get_all_sales()
-            if df.empty:
-                messagebox.showinfo("提示", "暂无销售记录")
+            stats = self.system.get_sales_statistics_data(dimension)
+            if stats is None:
+                messagebox.showinfo("提示", "暂无销售记录或商品信息")
                 return
 
-            # 获取商品信息
-            commodity_df = self.system.excel_manager.get_all_commodities()
-            if commodity_df.empty:
-                messagebox.showinfo("提示", "暂无商品信息，无法进行详细统计")
+            if isinstance(stats, dict) and dimension is not None:
+                messagebox.showinfo("提示", "暂无对应维度信息")
                 return
 
-            # 合并数据
-            merged_df = pd.merge(df, commodity_df[["商品编号", "茶类", "品种", "成本价"]], 
-                               on="商品编号", how="left")
+            if isinstance(stats, dict):
+                return
 
-            # 计算销售数量（转换为斤）- 使用向量化操作
-            unit_is_gram = merged_df.get('销售单位', '斤') == '克'
-            merged_df['销售数量(斤)'] = merged_df['销售数量']
-            merged_df.loc[unit_is_gram, '销售数量(斤)'] = merged_df.loc[unit_is_gram, '销售数量'] / 500
-            merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
-            merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
-
-            if dimension == "茶类":
-                if '茶类' in merged_df.columns:
-                    stats = merged_df.groupby('茶类').agg({
-                        '销售数量(斤)': 'sum',
-                        '实收金额': 'sum',
-                        '销售成本': 'sum',
-                        '利润': 'sum'
-                    }).round(2)
-                    stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
-                    # 将索引转换为列
-                    stats = stats.reset_index()
-                    self.show_dataframe_window(stats, "按茶类统计")
-                else:
-                    messagebox.showinfo("提示", "暂无茶类信息")
-            elif dimension == "品种":
-                if '品种' in merged_df.columns:
-                    stats = merged_df.groupby('品种').agg({
-                        '销售数量(斤)': 'sum',
-                        '实收金额': 'sum',
-                        '销售成本': 'sum',
-                        '利润': 'sum'
-                    }).round(2)
-                    stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
-                    # 将索引转换为列
-                    stats = stats.reset_index()
-                    self.show_dataframe_window(stats, "按品种统计")
-                else:
-                    messagebox.showinfo("提示", "暂无品种信息")
-            elif dimension == "商品":
-                if '商品名称' in merged_df.columns:
-                    stats = merged_df.groupby(['商品编号', '商品名称']).agg({
-                        '销售数量(斤)': 'sum',
-                        '实收金额': 'sum',
-                        '销售成本': 'sum',
-                        '利润': 'sum'
-                    }).round(2)
-                    stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
-                    # 将索引转换为列
-                    stats = stats.reset_index()
-                    self.show_dataframe_window(stats, "按商品统计")
-                else:
-                    messagebox.showinfo("提示", "暂无商品名称信息")
+            self.show_dataframe_window(stats, f"按{dimension}统计")
         except Exception as e:
             messagebox.showerror("错误", f"统计失败: {e}")
 
@@ -429,53 +378,10 @@ class StatsViewMixin:
     def statistics_by_time(self, time_unit):
         """按时间单位统计"""
         try:
-            df = self.system.excel_manager.get_all_sales()
-            if df.empty:
+            stats = self.system.get_sales_statistics_by_time_data(time_unit)
+            if stats is None:
                 messagebox.showinfo("提示", "暂无销售记录")
                 return
-
-            # 转换销售日期为日期类型
-            df['销售日期'] = pd.to_datetime(df['销售日期'], errors='coerce')
-
-            # 计算销售数量（转换为斤）
-            def calculate_quantity(row):
-                quantity = row['销售数量']
-                unit = row.get('销售单位', '斤')
-                return quantity / 500 if unit == '克' else quantity
-
-            df['销售数量(斤)'] = df.apply(calculate_quantity, axis=1)
-
-            # 获取商品信息计算成本
-            commodity_df = self.system.excel_manager.get_all_commodities()
-            if not commodity_df.empty:
-                merged_df = pd.merge(df, commodity_df[["商品编号", "成本价"]], 
-                                   on="商品编号", how="left")
-                merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
-                merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
-            else:
-                merged_df = df
-                merged_df['销售成本'] = 0
-                merged_df['利润'] = merged_df['实收金额']
-
-            # 按时间分组
-            if time_unit == "日":
-                grouped = merged_df.groupby(merged_df['销售日期'].dt.date)
-            elif time_unit == "周":
-                grouped = merged_df.groupby(merged_df['销售日期'].dt.to_period('W'))
-            elif time_unit == "月":
-                grouped = merged_df.groupby(merged_df['销售日期'].dt.to_period('M'))
-
-            stats = grouped.agg({
-                '销售数量(斤)': 'sum',
-                '实收金额': 'sum',
-                '销售成本': 'sum',
-                '利润': 'sum'
-            }).round(2)
-            stats['利润率(%)'] = (stats['利润'] / stats['实收金额'] * 100).round(2)
-            # 将索引转换为列
-            stats = stats.reset_index()
-            # 重命名时间列
-            stats = stats.rename(columns={'index': f'{time_unit}期'})
 
             self.show_dataframe_window(stats, f"按{time_unit}统计")
         except Exception as e:
@@ -484,29 +390,10 @@ class StatsViewMixin:
     def top_selling_products_gui(self):
         """热销商品排行GUI"""
         try:
-            df = self.system.excel_manager.get_all_sales()
-            if df.empty:
+            stats = self.system.get_top_selling_products_data()
+            if stats is None:
                 messagebox.showinfo("提示", "暂无销售记录")
                 return
-
-            # 计算销售数量（转换为斤）
-            def calculate_quantity(row):
-                quantity = row['销售数量']
-                unit = row.get('销售单位', '斤')
-                return quantity / 500 if unit == '克' else quantity
-
-            df['销售数量(斤)'] = df.apply(calculate_quantity, axis=1)
-
-            # 按商品分组
-            stats = df.groupby(['商品编号', '商品名称']).agg({
-                '销售数量(斤)': 'sum',
-                '实收金额': 'sum'
-            }).round(2)
-
-            # 按销售数量排序
-            stats = stats.sort_values(by='销售数量(斤)', ascending=False).head(10)
-            # 将索引转换为列
-            stats = stats.reset_index()
 
             self.show_dataframe_window(stats, "热销商品排行")
         except Exception as e:
@@ -515,33 +402,16 @@ class StatsViewMixin:
     def profit_analysis_gui(self):
         """盈利分析GUI"""
         try:
-            df = self.system.excel_manager.get_all_sales()
-            if df.empty:
-                messagebox.showinfo("提示", "暂无销售记录")
+            result = self.system.get_profit_analysis_data()
+            if result is None:
+                messagebox.showinfo("提示", "暂无销售记录或商品信息")
                 return
 
-            # 获取商品信息
-            commodity_df = self.system.excel_manager.get_all_commodities()
-            if commodity_df.empty:
-                messagebox.showinfo("提示", "暂无商品信息，无法进行盈利分析")
-                return
-
-            # 合并数据
-            merged_df = pd.merge(df, commodity_df[["商品编号", "成本价"]], 
-                               on="商品编号", how="left")
-
-            # 计算销售数量（转换为斤）- 使用向量化操作
-            unit_is_gram = merged_df.get('销售单位', '斤') == '克'
-            merged_df['销售数量(斤)'] = merged_df['销售数量']
-            merged_df.loc[unit_is_gram, '销售数量(斤)'] = merged_df.loc[unit_is_gram, '销售数量'] / 500
-            merged_df['销售成本'] = merged_df['销售数量(斤)'] * merged_df['成本价']
-            merged_df['利润'] = merged_df['实收金额'] - merged_df['销售成本']
-
-            # 计算总体盈利情况
-            total_income = merged_df['实收金额'].sum()
-            total_cost = merged_df['销售成本'].sum()
-            total_profit = merged_df['利润'].sum()
-            profit_margin = (total_profit / total_income * 100) if total_income > 0 else 0
+            total_income = result['total_income']
+            total_cost = result['total_cost']
+            total_profit = result['total_profit']
+            profit_margin = result['profit_margin']
+            product_profit = result['product_profit']
 
             # 显示盈利分析结果
             result_window = self._create_toplevel_with_size("profit_analysis", "medium")
@@ -568,18 +438,6 @@ class StatsViewMixin:
             tk.Label(frame, text=f"总销售成本: {total_cost:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=5)
             tk.Label(frame, text=f"总利润: {total_profit:.2f} 元", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=5)
             tk.Label(frame, text=f"利润率: {profit_margin:.2f}%", font=Styles.LABEL_FONT, bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(pady=5)
-
-            # 显示按商品的盈利情况
-            product_profit = merged_df.groupby(['商品编号', '商品名称']).agg({
-                '销售数量(斤)': 'sum',
-                '实收金额': 'sum',
-                '销售成本': 'sum',
-                '利润': 'sum'
-            }).round(2)
-            product_profit['利润率(%)'] = (product_profit['利润'] / product_profit['实收金额'] * 100).round(2)
-            product_profit = product_profit.sort_values(by='利润', ascending=False)
-            # 将索引转换为列
-            product_profit = product_profit.reset_index()
 
             btn_frame = tk.Frame(result_window, bg=Styles.BACKGROUND_COLOR)
             btn_frame.pack(pady=Styles.PADY_MEDIUM)
