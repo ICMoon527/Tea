@@ -824,9 +824,8 @@ class ExcelManager:
                     if sheet_exists:
                         wb.remove(wb[sheet_name])
                     ws = wb.create_sheet(sheet_name)
-
-                if new_columns:
-                    ws.append(new_columns)
+                    if new_columns:
+                        ws.append(new_columns)
 
                 if not data_to_write.empty:
                     row_count = 0
