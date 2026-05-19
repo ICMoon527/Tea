@@ -5,6 +5,9 @@ from datetime import datetime, timedelta
 import os
 from styles import Styles
 from validators import validate_required, validate_numeric, highlight_entry_error, clear_entry_highlight
+from logger import get_logger
+
+_logger = get_logger()
 
 
 class PurchaseViewMixin:
@@ -159,8 +162,8 @@ class PurchaseViewMixin:
                 remarks = remarks_var.get().strip()
 
                 commodity_before = self.system.excel_manager.get_commodity_by_id(com_id)
-                stock_before = float(commodity_before['当前库存']) if commodity_before else 0
-                cost_before = float(commodity_before['成本价']) if commodity_before and pd.notna(commodity_before['成本价']) else 0
+                stock_before = float(commodity_before['当前库存']) if commodity_before is not None else 0
+                cost_before = float(commodity_before['成本价']) if commodity_before is not None and pd.notna(commodity_before['成本价']) else 0
 
                 result = self.system.create_stock_record_business(
                     com_id=com_id, unit_price=unit_price, quantity=quantity,
@@ -172,7 +175,7 @@ class PurchaseViewMixin:
                     return
 
                 stock_id = result['stock_id']
-                commodity_name = commodity_before['商品名称'] if commodity_before else com_id
+                commodity_name = commodity_before['商品名称'] if commodity_before is not None else com_id
                 stock_data = [stock_id, com_id, commodity_name, quantity, unit_price,
                               supplier, stock_date, remarks, unit]
                 self.undo_manager.record_action(
@@ -186,6 +189,7 @@ class PurchaseViewMixin:
                 messagebox.showinfo("成功", f"进货入库成功！\n进货编号: {stock_id}")
                 top.destroy()
             except ValueError as e:
+                _logger.exception("进货数据输入错误")
                 messagebox.showerror("错误", f"数据输入错误: {e}")
             except Exception as e:
                 messagebox.showerror("错误", f"进货失败: {e}")

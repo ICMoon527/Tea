@@ -1,6 +1,16 @@
 import tkinter as tk
 from tkinter import ttk
+from PIL import ImageTk
 from styles import Styles
+from icons import get_icon
+
+_photo_refs = []
+
+
+def _keep_ref(photo):
+    _photo_refs.append(photo)
+    if len(_photo_refs) > 200:
+        _photo_refs[:] = _photo_refs[-100:]
 
 
 def create_menu_card(parent, text, command, icon, row, col):
@@ -170,15 +180,26 @@ def create_button_grid(parent, buttons, columns=None):
         content.grid_rowconfigure(1, weight=2)
         content.grid_columnconfigure(0, weight=1)
 
-        icon_label = tk.Label(
-            content,
-            text=icon,
-            font=("微软雅黑", 36),
-            bg=Styles.SURFACE_COLOR,
-            fg=Styles.PRIMARY_COLOR,
-            anchor=tk.CENTER,
-            justify=tk.CENTER
-        )
+        pil_img = get_icon(icon, 44)
+        if pil_img:
+            photo_img = ImageTk.PhotoImage(pil_img)
+            _keep_ref(photo_img)
+            icon_label = tk.Label(
+                content,
+                image=photo_img,
+                bg=Styles.SURFACE_COLOR,
+                anchor=tk.CENTER
+            )
+        else:
+            icon_label = tk.Label(
+                content,
+                text=icon,
+                font=("微软雅黑", 36),
+                bg=Styles.SURFACE_COLOR,
+                fg=Styles.PRIMARY_COLOR,
+                anchor=tk.CENTER,
+                justify=tk.CENTER
+            )
         icon_label.grid(row=0, column=0, sticky="nsew", pady=(5, 0))
 
         text_label = tk.Label(

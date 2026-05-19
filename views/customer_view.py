@@ -190,6 +190,7 @@ class CustomerViewMixin:
                 messagebox.showinfo("成功", f"客户添加成功！\n客户编号: {new_customer_id}\n客户等级: {result['customer_level']}")
                 top.destroy()
             except ValueError as e:
+                _logger.exception("客户添加数据输入错误")
                 messagebox.showerror("错误", f"数据输入错误: {e}")
             except Exception as e:
                 messagebox.showerror("错误", f"添加失败: {e}")

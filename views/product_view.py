@@ -6,6 +6,9 @@ import os
 from styles import Styles
 from validators import validate_required, validate_numeric, validate_integer, highlight_entry_error, clear_entry_highlight
 from tea_commodity import TeaCommodity
+from logger import get_logger
+
+_logger = get_logger()
 
 
 class ProductViewMixin:
@@ -246,6 +249,7 @@ class ProductViewMixin:
                 messagebox.showinfo("成功", f"商品添加成功！\n商品编号: {new_com_id}")
                 top.destroy()
             except ValueError as e:
+                _logger.exception("商品添加数据输入错误")
                 messagebox.showerror("错误", f"数据输入错误: {e}")
             except Exception as e:
                 messagebox.showerror("错误", f"添加失败: {e}")
