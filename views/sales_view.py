@@ -6,7 +6,6 @@ import os
 from styles import Styles
 from validators import validate_required, validate_numeric, validate_integer, highlight_entry_error, clear_entry_highlight
 from sale_record import SaleRecord
-from utils import convert_to_jin
 
 
 class SalesViewMixin:
@@ -537,13 +536,12 @@ class SalesViewMixin:
             discount_ratio = 1.0
         for item in cart_items:
             sale_id = self.system.excel_manager.generate_id('S', '销售记录', '销售编号')
-            quantity_in_jin = convert_to_jin(item['购买数量'], item['购买单位'])
             item_received_amount = item['小计'] * discount_ratio
             sale_record = SaleRecord(
                 sale_id=sale_id,
                 com_id=item['商品编号'],
                 com_name=item['商品名称'],
-                quantity=quantity_in_jin,
+                quantity=item['购买数量'],
                 unit_price=item['单价(每斤)'],
                 total_amount=item['小计'],
                 received_amount=item_received_amount,

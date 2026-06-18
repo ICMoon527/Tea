@@ -113,14 +113,13 @@ class ShoppingCart:
         for item in self.items:
             sale_id = self.excel_manager.generate_id('S', '销售记录', '销售编号')
             sale_ids.append(sale_id)
-            quantity_in_jin = convert_to_jin(item['购买数量'], item['购买单位'])
             item_received_amount = item['小计'] * discount_ratio
 
             sale_record = SaleRecord(
                 sale_id=sale_id,
                 com_id=item['商品编号'],
                 com_name=item['商品名称'],
-                quantity=quantity_in_jin,
+                quantity=item['购买数量'],
                 unit_price=item['单价(每斤)'],
                 total_amount=item['小计'],
                 received_amount=item_received_amount,

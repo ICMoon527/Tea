@@ -2,6 +2,7 @@ import os
 import json
 import shutil
 import hashlib
+import threading
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 from pathlib import Path
@@ -29,6 +30,7 @@ class CloudSyncManager:
         self.config = self._load_config()
         self.ssh_client = None
         self.sftp_client = None
+        self._long_connection = False
     
     def _load_config(self) -> Dict[str, Any]:
         """加载同步配置"""
@@ -155,6 +157,10 @@ class CloudSyncManager:
         if self.ssh_client and self.ssh_client.get_transport() and self.ssh_client.get_transport().is_active():
             return True
         
+        # 长连接模式下，如果已有连接断开则清理后重建
+        if self._long_connection and self.ssh_client is not None:
+            self._disconnect()
+        
         try:
             server_config = self.config.get("server", {})
             self.ssh_client = paramiko.SSHClient()
@@ -165,7 +171,7 @@ class CloudSyncManager:
                 port=server_config.get("port", 22),
                 username=server_config.get("username"),
                 password=server_config.get("password"),
-                timeout=30
+                timeout=8
             )
             
             self.sftp_client = self.ssh_client.open_sftp()
@@ -191,6 +197,35 @@ class CloudSyncManager:
                 self.ssh_client = None
         except:
             pass
+    
+    def begin_session(self) -> Dict[str, Any]:
+        """开始长连接会话（页面打开时调用，在后台线程执行）
+        
+        Returns:
+            {"success": bool, "message": str}
+        """
+        self._long_connection = True
+        try:
+            if self._connect():
+                return {"success": True, "message": "服务器连接成功"}
+            else:
+                self._long_connection = False
+                return {"success": False, "message": "服务器连接失败"}
+        except Exception as e:
+            self._long_connection = False
+            return {"success": False, "message": str(e)}
+
+    def end_session(self) -> None:
+        """结束长连接会话（页面关闭时调用）"""
+        self._long_connection = False
+        self._disconnect()
+
+    def is_session_active(self) -> bool:
+        """检查长连接是否活跃"""
+        return (self._long_connection and 
+                self.ssh_client is not None and 
+                self.ssh_client.get_transport() is not None and 
+                self.ssh_client.get_transport().is_active())
     
     def _ensure_remote_path_exists(self) -> bool:
         """确保远程路径存在"""
@@ -276,7 +311,8 @@ class CloudSyncManager:
         except Exception as e:
             result["message"] = f"同步失败: {str(e)}"
         finally:
-            self._disconnect()
+            if not self._long_connection:
+                self._disconnect()
         
         return result
     
@@ -314,7 +350,8 @@ class CloudSyncManager:
         except Exception as e:
             self.logger.error(f"获取云端文件列表失败: {e}")
         finally:
-            self._disconnect()
+            if not self._long_connection:
+                self._disconnect()
         
         return packages
     
@@ -383,7 +420,8 @@ class CloudSyncManager:
         except Exception as e:
             result["message"] = f"恢复数据失败: {str(e)}"
         finally:
-            self._disconnect()
+            if not self._long_connection:
+                self._disconnect()
         
         return result
     
@@ -412,10 +450,29 @@ class CloudSyncManager:
         except Exception as e:
             result["message"] = f"连接测试失败: {str(e)}"
         finally:
-            self._disconnect()
+            if not self._long_connection:
+                self._disconnect()
         
         return result
     
+    def run_async(self, func, on_result, *args, **kwargs):
+        """在后台线程执行 SFTP 操作，完成后回调 on_result(result_dict)
+        
+        Args:
+            func: 要执行的方法（如 self.upload_to_cloud）
+            on_result: 结果回调函数，接收 {"success": bool, "message": str, ...}
+            *args, **kwargs: 传给 func 的参数
+        """
+        def runner():
+            try:
+                result = func(*args, **kwargs)
+            except Exception as e:
+                result = {"success": False, "message": f"操作异常: {str(e)}"}
+            on_result(result)
+        
+        thread = threading.Thread(target=runner, daemon=True)
+        thread.start()
+
     def _format_size(self, size_bytes: int) -> str:
         """格式化文件大小显示"""
         for unit in ['B', 'KB', 'MB', 'GB']:

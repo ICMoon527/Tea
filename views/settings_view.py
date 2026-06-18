@@ -374,6 +374,25 @@ class SettingsViewMixin:
             pady=5
         ).pack(pady=Styles.PADY_MEDIUM)
 
+    def _set_cloud_buttons_state(self, buttons: list, enabled: bool):
+        """批量设置云端同步按钮的启用/禁用状态"""
+        state = tk.NORMAL if enabled else tk.DISABLED
+        for btn in buttons:
+            try:
+                btn.config(state=state)
+            except Exception:
+                pass
+
+    def _set_cloud_loading(self, status_label: tk.Label, buttons: list,
+                            text: str, loading: bool = True):
+        """设置加载状态：更新状态标签 + 禁用/启用按钮"""
+        status_label.config(text=text)
+        self._set_cloud_buttons_state(buttons, not loading)
+        try:
+            status_label.master.update_idletasks()
+        except Exception:
+            pass
+
     def cloud_sync_management(self):
         """云端同步管理界面 - SFTP 版本"""
         top = self._create_toplevel_with_size("cloud_sync_management", "large")
@@ -403,6 +422,16 @@ class SettingsViewMixin:
             fg=Styles.TEXT_COLOR
         )
         status_label.pack(anchor=tk.W)
+        
+        # 操作状态标签（新增）
+        loading_label = tk.Label(
+            status_frame,
+            text="",
+            font=Styles.LABEL_FONT,
+            bg=Styles.BACKGROUND_COLOR,
+            fg=Styles.PRIMARY_COLOR
+        )
+        loading_label.pack(anchor=tk.W, pady=(2, 0))
         
         # 服务器配置区域
         config_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR, relief=tk.SOLID, bd=1)
@@ -446,11 +475,17 @@ class SettingsViewMixin:
         remote_path_entry = tk.Entry(config_frame, textvariable=remote_path_var, width=50, font=Styles.TEXT_FONT)
         remote_path_entry.grid(row=3, column=1, columnspan=3, padx=5, pady=5, sticky=tk.W)
         
+        # ---- 所有回调函数定义 ----
+        
         def update_status():
             """更新状态显示"""
             sync_status = self.cloud_sync_manager.get_sync_status()
             if sync_status['enabled']:
-                status_text = f"同步状态: 已启用 | 服务器: {sync_status['host']}:{sync_status['port']} | 用户: {sync_status['username']}"
+                status_text = f"同步状态: 已启用 | {sync_status['host']}:{sync_status['port']}"
+                if sync_status['connected']:
+                    status_text += " | 已连接"
+                else:
+                    status_text += " | 未连接"
                 if sync_status['last_sync_time']:
                     status_text += f" | 最后同步: {sync_status['last_sync_time'][:19]}"
                 status_label.config(text=status_text, fg=Styles.SUCCESS_COLOR)
@@ -469,6 +504,32 @@ class SettingsViewMixin:
             if sync_status['username']:
                 username_var.set(sync_status['username'])
             remote_path_var.set(sync_status['remote_path'])
+        
+        # 按钮引用列表（排除"关闭"按钮）
+        cloud_action_buttons = []
+        
+        def _set_buttons_state(enabled):
+            self._set_cloud_buttons_state(cloud_action_buttons, enabled)
+        
+        def _populate_cloud_tree(packages):
+            """将数据填充到 tree_cloud 控件"""
+            for item in tree_cloud.get_children():
+                tree_cloud.delete(item)
+            if not packages:
+                return
+            for pkg in packages:
+                tree_cloud.insert("", tk.END, values=(
+                    pkg.get('filename', ''),
+                    pkg.get('size_formatted', ''),
+                    pkg.get('modified_time_str', '')
+                ))
+        
+        def _on_refresh_done(result):
+            """刷新列表完成"""
+            _populate_cloud_tree(result)
+            update_status()
+            loading_label.config(text="就绪")
+            _set_buttons_state(True)
         
         def save_server_config():
             """保存服务器配置"""
@@ -492,46 +553,86 @@ class SettingsViewMixin:
                         details=f"配置 SFTP 服务器: {host}:{port}"
                     )
                     update_status()
-                    refresh_cloud_list()
                 else:
                     messagebox.showerror("错误", "保存配置失败！")
             except ValueError:
                 messagebox.showerror("错误", "端口必须是数字！")
         
         def test_connection():
-            """测试服务器连接"""
-            result = self.cloud_sync_manager.test_connection()
+            """测试服务器连接（异步）"""
+            loading_label.config(text="正在测试连接...")
+            _set_buttons_state(False)
+            
+            def on_done(result):
+                top.after(0, lambda: _handle_test_result(result))
+            
+            self.cloud_sync_manager.run_async(
+                self.cloud_sync_manager.test_connection,
+                on_done
+            )
+        
+        def _handle_test_result(result):
             if result['success']:
                 messagebox.showinfo("成功", result['message'])
             else:
                 messagebox.showerror("错误", result['message'])
+            update_status()
+            loading_label.config(text="就绪")
+            _set_buttons_state(True)
         
         def upload_to_cloud():
-            """上传数据到云端"""
+            """上传数据到云端（异步）"""
             if not self.cloud_sync_manager.is_enabled():
                 messagebox.showwarning("提示", "请先配置并保存服务器连接！")
                 return
             
-            data_files = ["tea_inventory.xlsx", "config.json", "operation_logs.xlsx", "cloud_sync_config.json"]
-            result = self.cloud_sync_manager.upload_to_cloud(data_files)
+            if not self.cloud_sync_manager.is_session_active():
+                messagebox.showwarning("提示", "服务器连接已断开，请关闭窗口后重新打开")
+                return
             
+            loading_label.config(text="正在上传数据到云端...")
+            _set_buttons_state(False)
+            data_files = ["tea_inventory.xlsx", "config.json", "operation_logs.xlsx", "cloud_sync_config.json"]
+            
+            def on_done(result):
+                top.after(0, lambda: _handle_upload_result(result))
+            
+            self.cloud_sync_manager.run_async(
+                self.cloud_sync_manager.upload_to_cloud,
+                on_done,
+                data_files
+            )
+        
+        def _handle_upload_result(result):
             if result['success']:
                 uploaded_str = ", ".join(result.get('uploaded_files', []))
                 messagebox.showinfo("成功", f"{result['message']}\n上传文件: {uploaded_str}")
                 self.operation_logger.log_operation(
                     operation_type="上传",
                     module="云端同步",
-                    details=f"上传数据到 SFTP 服务器，版本: {result['version']}"
+                    details=f"上传数据到 SFTP 服务器，版本: {result.get('version', 0)}"
                 )
                 update_status()
-                refresh_cloud_list()
+                # 异步刷新列表
+                loading_label.config(text="正在刷新文件列表...")
+                self.cloud_sync_manager.run_async(
+                    self.cloud_sync_manager.list_cloud_packages,
+                    lambda r: top.after(0, lambda: _on_refresh_done(r))
+                )
             else:
                 messagebox.showerror("错误", result['message'])
+                loading_label.config(text="就绪")
+                _set_buttons_state(True)
+                update_status()
         
         def download_from_cloud():
-            """从云端下载数据"""
+            """从云端下载数据（异步）"""
             if not self.cloud_sync_manager.is_enabled():
                 messagebox.showwarning("提示", "请先配置并保存服务器连接！")
+                return
+            
+            if not self.cloud_sync_manager.is_session_active():
+                messagebox.showwarning("提示", "服务器连接已断开，请关闭窗口后重新打开")
                 return
             
             confirm = messagebox.askyesno(
@@ -542,40 +643,59 @@ class SettingsViewMixin:
             if not confirm:
                 return
             
-            result = self.cloud_sync_manager.download_from_cloud(".")
+            loading_label.config(text="正在从云端下载数据...")
+            _set_buttons_state(False)
             
+            def on_done(result):
+                top.after(0, lambda: _handle_download_result(result))
+            
+            self.cloud_sync_manager.run_async(
+                self.cloud_sync_manager.download_from_cloud,
+                on_done,
+                "."
+            )
+        
+        def _handle_download_result(result):
             if result['success']:
                 restored_str = ", ".join(result.get('restored_files', []))
                 messagebox.showinfo("成功", f"{result['message']}\n恢复文件: {restored_str}")
                 self.operation_logger.log_operation(
                     operation_type="下载",
                     module="云端同步",
-                    details=f"从 SFTP 服务器恢复数据"
+                    details="从 SFTP 服务器恢复数据"
                 )
                 self.system.excel_manager.clear_cache()
                 update_status()
-                refresh_cloud_list()
+                # 异步刷新列表
+                loading_label.config(text="正在刷新文件列表...")
+                self.cloud_sync_manager.run_async(
+                    self.cloud_sync_manager.list_cloud_packages,
+                    lambda r: top.after(0, lambda: _on_refresh_done(r))
+                )
             else:
                 messagebox.showerror("错误", result['message'])
+                loading_label.config(text="就绪")
+                _set_buttons_state(True)
+                update_status()
         
         def refresh_cloud_list():
-            """刷新云端文件列表"""
-            for item in tree_cloud.get_children():
-                tree_cloud.delete(item)
+            """刷新云端文件列表（异步）"""
+            loading_label.config(text="正在刷新文件列表...")
+            _set_buttons_state(False)
             
-            packages = self.cloud_sync_manager.list_cloud_packages()
-            for pkg in packages:
-                tree_cloud.insert("", tk.END, values=(
-                    pkg.get('filename', ''),
-                    pkg.get('size_formatted', ''),
-                    pkg.get('modified_time_str', '')
-                ))
+            def on_done(result):
+                top.after(0, lambda: _on_refresh_done(result))
+            
+            self.cloud_sync_manager.run_async(
+                self.cloud_sync_manager.list_cloud_packages,
+                on_done
+            )
         
-        # 配置操作按钮
+        # ---- 配置操作按钮 ----
         config_btn_frame = tk.Frame(config_frame, bg=Styles.BACKGROUND_COLOR)
         config_btn_frame.grid(row=4, column=0, columnspan=4, pady=10)
         
-        tk.Button(
+        save_btn = tk.Button(
             config_btn_frame, 
             text="保存配置", 
             font=Styles.BUTTON_FONT,
@@ -586,9 +706,11 @@ class SettingsViewMixin:
             relief=tk.FLAT,
             padx=10,
             pady=5
-        ).pack(side=tk.LEFT, padx=5)
+        )
+        save_btn.pack(side=tk.LEFT, padx=5)
+        cloud_action_buttons.append(save_btn)
         
-        tk.Button(
+        test_btn = tk.Button(
             config_btn_frame, 
             text="测试连接", 
             font=Styles.BUTTON_FONT,
@@ -599,13 +721,15 @@ class SettingsViewMixin:
             relief=tk.FLAT,
             padx=10,
             pady=5
-        ).pack(side=tk.LEFT, padx=5)
+        )
+        test_btn.pack(side=tk.LEFT, padx=5)
+        cloud_action_buttons.append(test_btn)
         
         # 操作按钮区域
         btn_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
         btn_frame.pack(pady=Styles.PADY_SMALL)
         
-        tk.Button(
+        upload_btn = tk.Button(
             btn_frame, 
             text="上传到云端", 
             font=Styles.BUTTON_FONT,
@@ -616,9 +740,11 @@ class SettingsViewMixin:
             relief=tk.FLAT,
             padx=10,
             pady=5
-        ).pack(side=tk.LEFT, padx=5)
+        )
+        upload_btn.pack(side=tk.LEFT, padx=5)
+        cloud_action_buttons.append(upload_btn)
         
-        tk.Button(
+        download_btn = tk.Button(
             btn_frame, 
             text="从云端下载", 
             font=Styles.BUTTON_FONT,
@@ -629,9 +755,11 @@ class SettingsViewMixin:
             relief=tk.FLAT,
             padx=10,
             pady=5
-        ).pack(side=tk.LEFT, padx=5)
+        )
+        download_btn.pack(side=tk.LEFT, padx=5)
+        cloud_action_buttons.append(download_btn)
         
-        tk.Button(
+        refresh_btn = tk.Button(
             btn_frame, 
             text="刷新列表", 
             font=Styles.BUTTON_FONT,
@@ -642,7 +770,9 @@ class SettingsViewMixin:
             relief=tk.FLAT,
             padx=10,
             pady=5
-        ).pack(side=tk.LEFT, padx=5)
+        )
+        refresh_btn.pack(side=tk.LEFT, padx=5)
+        cloud_action_buttons.append(refresh_btn)
         
         # 使用说明
         help_frame = tk.Frame(top, bg="#E8F4FD", relief=tk.SOLID, bd=1)
@@ -689,10 +819,48 @@ class SettingsViewMixin:
         scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
         tree_cloud.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         
-        # 加载现有配置并初始化
+        # ---- 页面初始化：后台建立长连接 + 自动刷新列表 ----
         load_existing_config()
         update_status()
-        refresh_cloud_list()
+        
+        def _on_session_ready(result):
+            if result['success']:
+                update_status()
+                loading_label.config(text="连接成功，正在加载文件列表...")
+                self.cloud_sync_manager.run_async(
+                    self.cloud_sync_manager.list_cloud_packages,
+                    lambda r: top.after(0, lambda: _on_initial_list_loaded(r))
+                )
+            else:
+                loading_label.config(text=f"连接失败: {result['message']}")
+                loading_label.config(fg=Styles.ERROR_COLOR)
+                _set_buttons_state(True)
+        
+        def _on_initial_list_loaded(result):
+            _populate_cloud_tree(result)
+            update_status()
+            loading_label.config(text="就绪")
+            _set_buttons_state(True)
+        
+        loading_label.config(text="正在连接服务器...")
+        _set_buttons_state(False)
+        self.cloud_sync_manager.run_async(
+            self.cloud_sync_manager.begin_session,
+            lambda r: top.after(0, lambda: _on_session_ready(r))
+        )
+        
+        # 关闭按钮（含断开连接逻辑）
+        def on_close():
+            self.cloud_sync_manager.end_session()
+            try:
+                w = top.winfo_width()
+                h = top.winfo_height()
+                self.config_manager.save_window_size("cloud_sync_management", w, h)
+            except Exception:
+                pass
+            top.destroy()
+        
+        top.protocol("WM_DELETE_WINDOW", on_close)
         
         tk.Button(
             top, 
@@ -700,7 +868,7 @@ class SettingsViewMixin:
             font=Styles.BUTTON_FONT,
             width=Styles.BUTTON_WIDTH,
             height=Styles.BUTTON_HEIGHT,
-            command=top.destroy,
+            command=on_close,
             bg=Styles.PRIMARY_COLOR,
             fg="white",
             relief=tk.FLAT,
