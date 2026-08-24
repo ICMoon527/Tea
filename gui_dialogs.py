@@ -248,6 +248,18 @@ def select_customer_dialog(parent, target_var):
         btn_cancel.pack(side=tk.LEFT, padx=Styles.PADX_SMALL)
         return
 
+    # 模糊搜索框（类似商品列表的模糊搜索）
+    search_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
+    search_frame.pack(pady=(Styles.PADY_SMALL, 0))
+    search_var = tk.StringVar()
+    tk.Label(search_frame, text="搜索客户: ", font=Styles.LABEL_FONT,
+             bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(side=tk.LEFT)
+    search_entry = tk.Entry(search_frame, textvariable=search_var,
+                            font=Styles.TEXT_FONT, width=30)
+    search_entry.pack(side=tk.LEFT, padx=(0, 5))
+    tk.Label(search_frame, text="支持名称模糊搜索", font=Styles.TEXT_FONT,
+             bg=Styles.BACKGROUND_COLOR, fg=Styles.TEXT_COLOR).pack(side=tk.LEFT)
+
     list_frame = tk.Frame(top, bg=Styles.BACKGROUND_COLOR)
     list_frame.pack(pady=Styles.PADY_MEDIUM, padx=Styles.PADX_MEDIUM, fill=tk.BOTH, expand=True)
 
@@ -264,14 +276,31 @@ def select_customer_dialog(parent, target_var):
     scrollbar_y.pack(side=tk.RIGHT, fill=tk.Y)
     tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-    for _, row in df.iterrows():
-        tree.insert("", tk.END, values=(
-            row.get('客户编号', ''),
-            row.get('客户名称', ''),
-            '' if pd.isna(row.get('联系电话')) else row.get('联系电话', ''),
-            '' if pd.isna(row.get('地址')) else row.get('地址', ''),
-            row.get('累计消费', 0) if pd.notna(row.get('累计消费')) else 0
-        ))
+    def _populate(filtered_df):
+        """清空并按筛选结果填充客户列表"""
+        for item in tree.get_children():
+            tree.delete(item)
+        for _, row in filtered_df.iterrows():
+            tree.insert("", tk.END, values=(
+                row.get('客户编号', ''),
+                row.get('客户名称', ''),
+                '' if pd.isna(row.get('联系电话')) else row.get('联系电话', ''),
+                '' if pd.isna(row.get('地址')) else row.get('地址', ''),
+                row.get('累计消费', 0) if pd.notna(row.get('累计消费')) else 0
+            ))
+
+    def _filter_customers(*_):
+        """根据关键词模糊筛选客户"""
+        keyword = search_var.get().strip()
+        if not keyword:
+            _populate(df)
+            return
+        mask = df['客户名称'].str.contains(keyword, case=False, na=False)
+        _populate(df[mask])
+
+    _populate(df)
+    search_entry.bind('<KeyRelease>', _filter_customers)
+    search_entry.bind('<Return>', _filter_customers)
 
     def on_double_click(event):
         selection = tree.selection()
