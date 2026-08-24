@@ -104,7 +104,7 @@ class ShoppingCart:
     def checkout(self, customer_name, received_amount):
         total_amount = self.get_total_amount()
         
-        if received_amount < total_amount and total_amount > 0:
+        if total_amount > 0:
             discount_ratio = received_amount / total_amount
         else:
             discount_ratio = 1.0
