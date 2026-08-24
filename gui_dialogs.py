@@ -1035,6 +1035,60 @@ def show_dataframe_window(parent, df, title):
             pady=5
         ).pack(side=tk.LEFT, padx=10)
 
+    if '销售编号' in columns:
+        def delete_selected_sale():
+            nonlocal total_rows, _columns_fitted
+            selected = tree.selection()
+            if not selected:
+                messagebox.showwarning("提示", "请先选择要删除的销售记录")
+                return
+
+            item = tree.item(selected[0])
+            values = item['values']
+            sale_id_idx = columns.index('销售编号')
+            sale_id = values[sale_id_idx]
+            com_name_idx = columns.index('商品名称') if '商品名称' in columns else None
+            com_name = values[com_name_idx] if com_name_idx is not None else ""
+
+            if not messagebox.askyesno(
+                "确认删除",
+                f"确定要删除销售记录 '{sale_id}'（{com_name}）吗？\n\n"
+                f"将同时回退：\n· 库存（加回已售数量）\n· 客户累计消费 / 订单数 / 客户等级\n\n"
+                f"此操作不可撤销！"
+            ):
+                return
+
+            success = parent.system.excel_manager.delete_sale(sale_id)
+            if not success:
+                messagebox.showerror("错误", "删除失败，请检查该记录是否存在")
+                return
+
+            # 从本地数据中移除已删除记录并刷新当前窗口（保留搜索/分页状态）
+            if _original_df is not None:
+                _original_df.drop(_original_df.index[_original_df['销售编号'] == sale_id], inplace=True)
+            if _search_filtered_df is not None:
+                _search_filtered_df.drop(_search_filtered_df.index[_search_filtered_df['销售编号'] == sale_id], inplace=True)
+
+            total_rows = len(_original_df) if _original_df is not None else total_rows
+            _columns_fitted = False
+            current_page_var.set(1)
+            refresh_page()
+            messagebox.showinfo("成功", "销售记录已删除，相关数据已回退")
+
+        tk.Button(
+            btn_frame,
+            text="删除选中销售记录",
+            font=Styles.BUTTON_FONT,
+            width=Styles.BUTTON_WIDTH,
+            height=Styles.BUTTON_HEIGHT,
+            command=delete_selected_sale,
+            bg=Styles.ERROR_COLOR,
+            fg="white",
+            relief=tk.FLAT,
+            padx=10,
+            pady=5
+        ).pack(side=tk.LEFT, padx=10)
+
     tk.Button(
         btn_frame,
         text="关闭",

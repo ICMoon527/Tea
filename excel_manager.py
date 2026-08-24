@@ -95,6 +95,16 @@ class ExcelManager:
             df = pd.read_excel(self.filename, sheet_name=sheet_name, engine='openpyxl')
             # 过滤掉 Unnamed 列
             df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+            # 自愈：过滤掉误写入数据区的重复表头行（避免列表显示重复表头并防止其传播）
+            if not df.empty and len(df.columns) > 1:
+                _first = df.columns[0]
+                _rest = df.iloc[:, 1:]
+                _rest_matches = _rest.eq(pd.Series(list(_rest.columns), index=_rest.columns), axis=1).sum(axis=1)
+                # 表头行特征：首列等于列名，且至少一个其他单元格等于对应列名
+                _header_like = (df[_first] == _first) & (_rest_matches >= 1)
+                if _header_like.any():
+                    df = df[~_header_like].reset_index(drop=True)
             
             # 针对特定工作表进行数据类型处理
             if sheet_name == "客户信息" and not df.empty:
@@ -111,6 +121,12 @@ class ExcelManager:
                 for col in numeric_columns:
                     if col in df.columns:
                         df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0.0)
+            elif sheet_name == "销售记录" and not df.empty:
+                # 将是否作废统一转换为布尔值，兼容历史数据中的字符串形式（TRUE/FALSE/true/false）
+                if '是否作废' in df.columns:
+                    df['是否作废'] = df['是否作废'].map(
+                        lambda v: str(v).strip().lower() == 'true' if pd.notna(v) else False
+                    )
             
             self._cache[sheet_name] = df.copy()
             self._dirty_flags[sheet_name] = False
@@ -330,6 +346,10 @@ class ExcelManager:
             # 过滤掉作废记录
             if '是否作废' in df.columns:
                 df = df[df['是否作废'] != True]
+        
+        # 新的销售记录排在前面（按销售日期倒序）
+        if not df.empty and '销售日期' in df.columns:
+            df = df.sort_values('销售日期', ascending=False, na_position='last')
         
         return df
     
@@ -811,7 +831,7 @@ class ExcelManager:
                     if ws.max_row > 0:
                         existing_columns = [cell.value for cell in ws[1]]
 
-                new_columns = data_to_write.columns.tolist() if not data_to_write.empty else []
+                new_columns = data_to_write.columns.tolist()
 
                 if sheet_exists and existing_columns == new_columns:
                     ws = wb[sheet_name]
@@ -888,6 +908,84 @@ class ExcelManager:
         df.at[idx[0], '是否作废'] = True
         self.write_sheet("销售记录", df)
         return True
+
+    def delete_sale(self, sale_id):
+        """删除销售记录并完整回退相关数据（库存加回、客户累计消费/订单数/等级/最后购买日期回退）
+
+        Args:
+            sale_id: 销售编号
+
+        Returns:
+            bool: 是否删除成功
+        """
+        df = self.read_sheet("销售记录")
+        if df.empty:
+            return False
+
+        idx_list = df[df['销售编号'] == sale_id].index
+        if len(idx_list) == 0:
+            return False
+        idx = idx_list[0]
+        sale = df.iloc[idx]
+
+        # 1. 回滚库存：当前库存 + 销售数量(转换为斤)
+        commodity = self.get_commodity_by_id(sale['商品编号'])
+        if commodity is not None:
+            qty_jin = convert_to_jin(sale['销售数量'], sale.get('销售单位', '克'))
+            current_stock = float(commodity['当前库存'])
+            self.update_commodity(sale['商品编号'], {'当前库存': current_stock + qty_jin})
+
+        # 2. 回退客户信息：累计消费减少、订单数减少、客户等级重新计算、最后购买日期更新
+        customer_name = sale.get('客户名称', '')
+        received = sale.get('实收金额', 0)
+        if customer_name and pd.notna(received):
+            self._revert_customer_after_sale(customer_name, sale_id, received)
+
+        # 3. 从销售记录表中删除该行
+        new_df = df.drop(index=idx)
+        self.write_sheet("销售记录", new_df)
+        return True
+
+    def _revert_customer_after_sale(self, customer_name, sale_id, amount):
+        """销售记录删除后回退客户信息"""
+        df = self.read_sheet("客户信息")
+        if df.empty:
+            return
+
+        customer_row = df[df['客户名称'] == customer_name]
+        if customer_row.empty:
+            return
+
+        idx = customer_row.index[0]
+        current_purchases = float(df.at[idx, '累计消费']) if pd.notna(df.at[idx, '累计消费']) else 0.0
+        current_orders = int(df.at[idx, '订单数']) if pd.notna(df.at[idx, '订单数']) else 0
+
+        new_purchases = max(0.0, current_purchases - float(amount))
+        new_orders = max(0, current_orders - 1)
+
+        # 重新计算客户等级
+        customer_level = self.calculate_customer_level(new_purchases)
+
+        # 完全重新创建列来确保数据类型正确
+        purchases_list = df['累计消费'].tolist()
+        purchases_list[idx] = float(new_purchases)
+        df['累计消费'] = pd.Series(purchases_list, dtype=float)
+
+        orders_list = df['订单数'].tolist()
+        orders_list[idx] = int(new_orders)
+        df['订单数'] = pd.Series(orders_list, dtype=int)
+
+        # 最后购买日期：取该客户剩余（未删除）销售记录中最新的日期
+        last_date = ""
+        sales_df = self.read_sheet("销售记录")
+        if not sales_df.empty and '客户名称' in sales_df.columns:
+            remaining = sales_df[(sales_df['客户名称'] == customer_name) & (sales_df['销售编号'] != sale_id)]
+            if not remaining.empty and '销售日期' in remaining.columns:
+                last_date = remaining['销售日期'].max()
+        df.at[idx, '最后购买日期'] = last_date
+        df.at[idx, '客户等级'] = customer_level
+
+        self.write_sheet("客户信息", df)
 
 
 class _AutoFlushContext:
